@@ -9,9 +9,9 @@ var async = require('async');
 
 require('ssl-root-cas/latest')
     .inject()
-    .addFile('./certs/COMODORSADomainValidationSecureServerCA.crt')
-    .addFile('./certs/COMODORSAAddTrustCA.crt')
-    .addFile('./certs/AddTrustExternalCARoot.crt');
+    .addFile(__dirname + '/certs/COMODORSADomainValidationSecureServerCA.crt')
+    .addFile(__dirname + '/certs/COMODORSAAddTrustCA.crt')
+    .addFile(__dirname + '/certs/AddTrustExternalCARoot.crt');
 
 const apiUrl = 'https://app.allow2.com:9443';
 
