@@ -2,7 +2,7 @@
   "name": "allow2-node-api",
   "version": "0.0.1",
   "description": "",
-  "main": "src/index.js",
+  "main": "index.js",
   "files": [
     "index.js"
   ],
@@ -11,7 +11,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "bin": {
-    "a2pair": "./src/a2pair.js"
+    "a2pair": "./a2pair.js"
   },
   "maintainers": [
     {
