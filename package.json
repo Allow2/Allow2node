@@ -1,11 +1,8 @@
 {
-  "name": "allow2-node-api",
+  "name": "allow2",
   "version": "0.0.1",
   "description": "",
   "main": "index.js",
-  "files": [
-    "index.js"
-  ],
   "homepage": "https://github.com/Allow2/allow2-node-api",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
