@@ -1,8 +1,17 @@
 {
   "name": "allow2",
-  "version": "0.1.0",
-  "description": "",
+  "version": "0.1.1",
+  "description": "Free and Powerful Parental Controls for your apps and devices",
   "main": "index.js",
+  "keywords": [
+    "Parental Controls",
+    "parental",
+    "time",
+    "limit",
+    "limits",
+    "quotas",
+    "gaming"
+  ],
   "homepage": "https://github.com/Allow2/allow2-node-api",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -18,7 +27,7 @@
     "url": "git+https://github.com/Allow2/allow2-node-api.git"
   },
   "author": "Allow2 Pty Ltd",
-  "license": "TBA",
+  "license": "SEE LICENSE IN LICENSE FILE",
   "dependencies": {
     "request": "^2.79.0",
     "ssl-root-cas": "^1.2.3"
