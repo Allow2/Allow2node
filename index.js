@@ -13,7 +13,8 @@ require('ssl-root-cas/latest')
     .addFile(__dirname + '/certs/COMODORSAAddTrustCA.crt')
     .addFile(__dirname + '/certs/AddTrustExternalCARoot.crt');
 
-const apiUrl = 'https://app.allow2.com:9443';
+const apiUrl = 'https://api.allow2.com';
+const stagingUrl = 'https://api.allow2.com:8443';
 
 var exports = {};
 
@@ -33,6 +34,7 @@ var exports = {};
  *     pass: "my super secret password",
  *     deviceToken: "346-34269hcubi-187gigi8g-14i3ugkug",
  *     deviceName: "Fred's iPhone"
+ *     staging: (set this to any value to use the staging server, if empty/undefined/missing then it will use production)
  * }, function(err, result) {
  *     console.log(result);
  * });
@@ -40,7 +42,7 @@ var exports = {};
 exports.pair = function pair(params, callback) {
     //console.log('user: %s pass: %s file: %s', program.username, program.password, deviceName);
     request({
-        url: apiUrl + '/api/pairDevice',
+        url: ( params.staging ? stagingUrl : apiUrl ) + '/api/pairDevice',
         method: 'POST',
         json: true,
         body: {

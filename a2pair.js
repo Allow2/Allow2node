@@ -3,7 +3,7 @@ var co = require('co');
 var prompt = require('co-prompt');
 var program = require('commander');
 var request = require('request');
-var allow2 = require('../allow2-node-api');
+var allow2 = require('./index.js');
 
 require('ssl-root-cas/latest')
     .inject()

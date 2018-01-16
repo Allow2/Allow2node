@@ -1,18 +1,19 @@
 {
   "name": "allow2",
-  "version": "0.1.2",
-  "description": "Free and Powerful Parental Controls for your apps and devices",
+  "version": "0.8.0",
+  "description": "Free and Powerful Parental Freedom for your apps and devices",
   "main": "index.js",
   "keywords": [
     "Parental Controls",
     "parental",
+    "freedom",
     "time",
     "limit",
     "limits",
     "quotas",
     "gaming"
   ],
-  "homepage": "https://github.com/Allow2/allow2-node-api",
+  "homepage": "https://github.com/Allow2/allow2node",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
