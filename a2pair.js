@@ -15,6 +15,7 @@ program
   .arguments('<device token> <device name>')
   .option('-u, --username <username>', 'The allow2 parent account user to authenticate as')
   .option('-p, --password <password>', 'The allow2 parent account user\'s password')
+  .option('-s, --staging', 'Use the staging server, not production')
   .action(pair)
   .parse(process.argv);
 
@@ -29,6 +30,7 @@ function pair(deviceToken, deviceName) {
     allow2.pair({
         user: program.username,
         pass: program.password,
+	staging: program.staging,
         deviceToken: deviceToken,
         deviceName: deviceName
     }, function(err, response){

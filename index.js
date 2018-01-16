@@ -14,7 +14,7 @@ require('ssl-root-cas/latest')
     .addFile(__dirname + '/certs/AddTrustExternalCARoot.crt');
 
 const apiUrl = 'https://api.allow2.com';
-const stagingUrl = 'https://api.allow2.com:8443';
+const stagingUrl = 'https://app.allow2.com:8443';
 
 var exports = {};
 
