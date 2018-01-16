@@ -74,10 +74,11 @@ exports.pair = function pair(params, callback) {
  *     userId: 1,
  *     pairToken: "98hbieg87-ilulieugil-dilufkucy",
  *     deviceToken: "iug893-kjg-fiug23",
- *     tz: 'Australia/Brisbane',                    // note, timezone is crucial to correctly calculate allowed times and day types
+ *     tz: 'Australia/Brisbane',                    // note: timezone is crucial to correctly calculate allowed times and day types
  *     childId: 10,
  *     activities: [ 1, 2 ],
- *     log: true
+ *     log: true,				    // note: if set, record the usage (log it) and deduct quota, otherwise it only checks the access is permitted.
+ *     staging: true                                // note: if set, use the staging environment, not production
  * }, function(err, result) {
  *     console.log(result);
  * });
@@ -90,7 +91,7 @@ exports.check = function pair(params, callback) {
     })*/
 
     request({
-        url: apiUrl + '/serviceapi/check',
+        url: ( params.staging ? stagingUrl : apiUrl ) + '/serviceapi/check',
         method: 'POST',
         json: true,
         body: {
