@@ -1,6 +1,6 @@
 {
   "name": "allow2",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Free and Powerful Parental Controls for your apps and devices",
   "main": "index.js",
   "keywords": [
@@ -24,7 +24,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Allow2/allow2-node-api.git"
+    "url": "git+https://github.com/Allow2/allow2node.git"
   },
   "author": "Allow2 Pty Ltd",
   "license": "SEE LICENSE IN LICENSE FILE",

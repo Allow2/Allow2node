@@ -1,4 +1,4 @@
-# Allow2node
+# Allow2 - Free and Powerful Parental Controls for your apps and devices
 
 [![npm package](https://nodei.co/npm/allow2.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/allow2/)
 
@@ -30,30 +30,23 @@ With Allow2 all you have to do to check if something can be used and record it's
 
 ```js
 var allow2 = require('allow2');
-let allow2Activities = [
-    Allow2.Allow2Activity(activity: Allow2.Activity.Internet, log: true), // this is an internet based app
-    Allow2.Allow2Activity(activity: Allow2.Activity.Gaming, log: true),   // and it's gaming related, can also use "Messaging", "Social", "Electricity" and more...
-]
-Allow2.shared.check(allow2Activities, callback)
+allow2.check({
+    userId: 1,
+    pairToken: "98hbieg87-ilulieugil-dilufkucy",
+    deviceToken: "iug893-kjg-fiug23",
+    tz: 'Australia/Brisbane', // note, timezone is crucial to correctly calculate allowed times and day types
+    childId: 10,
+    activities: [ 1, 2 ],
+    log: true
+}, function(err, result) {
+    console.log(result);
+});
 ```
 
 Callback:
 
 ```js
-function callback(error, response) {
-    let result  = userInfo["result"] as? Allow2CheckResult else {
-        print("No Allow2CheckResult found in notification")
-        return
-    }
-
-    dispatch_async(dispatch_get_main_queue()) {
-        self.allow2View.hidden = result.allowed
-
-        if (!result.allowed) {
-            // configure the block screen to explain the issue
-            self.allow2View.result = result
-        }
-    }
+function callback(err, result) {
 }
 
 ```
