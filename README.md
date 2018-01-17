@@ -11,10 +11,12 @@
 Allow2 makes it easy to add parental controls to your apps.
 
 1. [Why should you use Allow2?](#why-should-you-use-Allow2)
-2. [Requirements](#requirements)
-3. [Integration](#integration)
+2. [Installation](#installation)
+3. [Concepts](#concepts)
+4. [Usage](#usage)
+5. [Playing](#playing)
 
-## Why should you use Allow2?
+# Why should you use Allow2?
 
 Parental controls are incredibly complex and difficult to get correct and for a parent, there is nothing worse than having to log in or open up yet another parental control interface on another app and reconfigure it every other day.
 
@@ -25,6 +27,34 @@ Allow2 solves the problem once and for all:
 3. Show your community responsibility and support parents, this helps to bring more users to your apps.
 
 Really, you should be able to add extensive and powerful parental controls to your apps in a matter of hours or (at most) a couple of days.
+
+# Installation
+
+```js
+npm install --save allow2
+```
+
+# Concepts
+
+The APIs for Allow2 operate in 2 modes.
+
+## DEVICE MODE
+
+In this first API mode, you pair the device or app with the Allow2 Service and use that pairing credential to report all usage.
+
+This mode is used for toasters, lights, routers, gaming consoles, apps, etc. Things that are typically owned by one account or family.
+
+To use this mode, you pair the device/app FIRST and you supply the pairing credentials to the "check" call.
+
+
+## SERVICE MODE
+
+Inthis second API mode, you instead typically only install it once, and it is for service-based systems, social media platforms, web sites, etc. These are not owned by any one family or account, but are used by potentially thousands of people that may not be related (Facebook, Twitter, www.google.com, youtube, etc).
+
+To use this mode, you create a key/secret pair on the Allow2 Developer portal and supply the serviceID and Secret Key to the "check" call.
+
+
+# Usage
 
 With Allow2 all you have to do to check if something can be used and record it's usage is:
 
@@ -37,9 +67,10 @@ allow2.check({
     tz: 'Australia/Brisbane', // note, timezone is crucial to correctly calculate allowed times and day types
     childId: 10,
     activities: [ 1, 2 ],
-    log: true
+    log: true                   // use this to say you want usage recorded (logged) as well as checked
+    //, staging: true           // specify staging environment (default is production)
 }, function(err, result) {
-    console.log(result);
+    ... // this is the callback with results of the check
 });
 ```
 
@@ -47,14 +78,33 @@ Callback:
 
 ```js
 function callback(err, result) {
+    // result = { allowed: true,
+            activities: { '7': [Object], ... },
+            dayTypes: { today: [Object], tomorrow: [Object] }
+    // },
+    if (err) {
+        // can look into the err object to determine what action to take, do you allow usage?
+        // (Children may deliberately kill internet to get free use), or do you require access?
+        // Or do you give a grace period and cache the last response while offline?
+        return;
+    }
+    // result.allowed: true/false  // this is the macro feedback on approved/denied.
+    // you can dig in to the result.activities object to see the restrictions and bans/etc on each activity,
+    // determine when times will run out or next be available and how much quota is remaining for each activity.
+    
+    // result.dayTypes provides details on what day type it is today and tomorrow.
 }
 
 ```
 
-## Usage
+# Playing
 
-#### Initialization
+You can "play" with the library first using the following commands:
 
 ```js
-npm install --save allow2
+TBA
 ```
+
+# Todo
+
+* switch from pair and device ids to tokens.
