@@ -47,11 +47,29 @@ Callback:
 
 ```js
 function callback(err, result) {
+    // result = { allowed: true,
+            activities: { '7': [Object], ... },
+            dayTypes: { today: [Object], tomorrow: [Object] }
+    // },
+    if (err) {
+        // can look into the err object to determine what action to take, do you allow usage?
+        // (Children may deliberately kill internet to get free use), or do you require access?
+        // Or do you give a grace period and cache the last response while offline?
+        return;
+    }
+    // result.allowed: true/false  // this is the macro feedback on approved/denied.
+    // you can dig in to the result.activities object to see the restrictions and bans/etc on each activity,
+    // determine when times will run out or next be available and how much quota is remaining for each activity.
+    
+    // result.dayTypes provides details on what day type it is today and tomorrow.
 }
 
 ```
 
-## Usage
+## Testing
+
+TBA
+
 
 #### Initialization
 
