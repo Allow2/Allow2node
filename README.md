@@ -2,7 +2,7 @@
 
 [![npm package](https://nodei.co/npm/allow2.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/allow2/)
 
-[![Build status](https://img.shields.io/travis/allow2/allow2/master.svg?style=flat-square)](https://travis-ci.org/allow2/allow2)
+[![Build Status](https://img.shields.io/travis/Allow2/Allow2node/master.svg?style=flat-square)](https://travis-ci.org/Allow2/Allow2node)
 [![Coverage](https://img.shields.io/codecov/c/github/allow2node/allow2.svg?style=flat-square)](https://codecov.io/github/allow2/allow2?branch=master)
 [![Coverage](https://img.shields.io/coveralls/allow2/allow2.svg?style=flat-square)](https://coveralls.io/r/allow2/allow2)
 [![Dependency Status](https://img.shields.io/david/allow2/allow2.svg?style=flat-square)](https://david-dm.org/allow2/allow2)
