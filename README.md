@@ -1,7 +1,5 @@
 # Allow2 - Free and Powerful Parental Controls for your apps and devices
 
-[![Join the chat at https://gitter.im/Allow2/Allow2node](https://badges.gitter.im/Allow2/Allow2node.svg)](https://gitter.im/Allow2/Allow2node?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
 [![npm package](https://nodei.co/npm/allow2.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/allow2/)
 
 [![Build Status](https://img.shields.io/travis/Allow2/Allow2node/master.svg?style=flat-square)](https://travis-ci.org/Allow2/Allow2node)
@@ -9,6 +7,7 @@
 [![Coverage](https://img.shields.io/coveralls/allow2/allow2.svg?style=flat-square)](https://coveralls.io/r/Allow2/Allow2node)
 [![Dependency Status](https://img.shields.io/david/allow2/allow2.svg?style=flat-square)](https://david-dm.org/Allow2/Allow2node)
 [![Known Vulnerabilities](https://snyk.io/test/npm/allow2/badge.svg?style=flat-square)](https://snyk.io/test/npm/allow2)
+[![Join the chat at https://gitter.im/Allow2/Allow2node](https://badges.gitter.im/Allow2/Allow2node.svg)](https://gitter.im/Allow2/Allow2node?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 Allow2 makes it easy to add parental controls to your apps.
 
