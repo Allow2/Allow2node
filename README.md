@@ -1,5 +1,7 @@
 # Allow2 - Free and Powerful Parental Controls for your apps and devices
 
+[![Join the chat at https://gitter.im/Allow2/Allow2node](https://badges.gitter.im/Allow2/Allow2node.svg)](https://gitter.im/Allow2/Allow2node?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 [![npm package](https://nodei.co/npm/allow2.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/allow2/)
 
 [![Build Status](https://img.shields.io/travis/Allow2/Allow2node/master.svg?style=flat-square)](https://travis-ci.org/Allow2/Allow2node)
