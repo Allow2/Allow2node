@@ -29,6 +29,10 @@ Allow2 solves the problem once and for all:
 
 Really, you should be able to add extensive and powerful parental controls to your apps in a matter of hours or (at most) a couple of days.
 
+# Try it out
+
+Test Allow2 in your browser: [https://npm.runkit.com/allow2](https://npm.runkit.com/allow2)
+
 # Installation
 
 ```js
@@ -57,7 +61,6 @@ To use this mode, you create a key/secret pair on the Allow2 Developer portal an
 
 # Usage
 
-Try it out: [https://npm.runkit.com/allow2](https://npm.runkit.com/allow2)
 
 With Allow2 all you have to do to check if something can be used and record it's usage is:
 
