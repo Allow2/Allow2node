@@ -5,12 +5,6 @@ var program = require('commander');
 var request = require('request');
 var allow2 = require('./index.js');
 
-require('ssl-root-cas/latest')
-    .inject()
-    .addFile(__dirname + '/certs/COMODORSADomainValidationSecureServerCA.crt')
-    .addFile(__dirname + '/certs/COMODORSAAddTrustCA.crt')
-    .addFile(__dirname + '/certs/AddTrustExternalCARoot.crt');
-
 program
   .arguments('<device token> <device name>')
   .option('-u, --username <username>', 'The allow2 parent account user to authenticate as')
@@ -30,7 +24,7 @@ function pair(deviceToken, deviceName) {
     allow2.pair({
         user: program.username,
         pass: program.password,
-	staging: program.staging,
+	    staging: program.staging,
         deviceToken: deviceToken,
         deviceName: deviceName
     }, function(err, response){

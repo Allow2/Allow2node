@@ -57,6 +57,8 @@ To use this mode, you create a key/secret pair on the Allow2 Developer portal an
 
 # Usage
 
+Try it out: [https://npm.runkit.com/allow2](https://npm.runkit.com/allow2)
+
 With Allow2 all you have to do to check if something can be used and record it's usage is:
 
 ```js
