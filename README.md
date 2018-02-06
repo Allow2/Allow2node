@@ -33,7 +33,7 @@ Really, you should be able to add extensive and powerful parental controls to yo
 
 Test Allow2 in your browser: [https://npm.runkit.com/allow2](https://npm.runkit.com/allow2)
 
-Use the staging server to create a parent account and add children: [https://staging.allow2.com/ltr/devices](https://staging.allow2.com/ltr/devices)
+Use the staging server to create a parent account and add children: [https://staging.allow2.com](https://staging.allow2.com)
 
 # Installation
 

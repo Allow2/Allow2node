@@ -1,4 +1,4 @@
-var allow2 = require("./allow2node")
+var allow2 = require("allow2")
 
 //
 // start by "pairing" the device or service to the allow2 platform
