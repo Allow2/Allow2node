@@ -38,5 +38,6 @@
   },
   "devDependencies": {
     "jshint": "^2.9.5"
-  }
+  },
+  "runkitExampleFilename": "runkit-example.js"
 }

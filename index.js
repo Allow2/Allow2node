@@ -7,14 +7,14 @@
 var request = require('request');
 var async = require('async');
 
-require('ssl-root-cas/latest')
+require('ssl-root-cas')
     .inject()
     .addFile(__dirname + '/certs/COMODORSADomainValidationSecureServerCA.crt')
     .addFile(__dirname + '/certs/COMODORSAAddTrustCA.crt')
     .addFile(__dirname + '/certs/AddTrustExternalCARoot.crt');
 
 const apiUrl = 'https://api.allow2.com';
-const stagingUrl = 'https://app.allow2.com:8443';
+const stagingUrl = 'https://staging-api.allow2.com';
 
 var exports = {};
 
@@ -50,6 +50,44 @@ exports.pair = function pair(params, callback) {
             pass: params.pass,
             deviceToken: params.deviceToken,
             name: params.deviceName
+        }
+    }, function(err, httpResponse, body) {
+        if (err) {
+            return callback(err);
+        }
+        return callback(null, body);
+    });
+};
+
+/**
+ * Status routine, call this to get current status of this connection and relevant important information
+ * currently returns only the list of children (so if a new child is added, the device can see that new child.
+ *
+ * @name status
+ * @static
+ * @param {Object} params - An object containing the userId, pairToken and deviceToken for checking status
+ * @param callback
+ * @example
+ *
+ * allow2.status({
+ *     userId: 1,
+ *     pairToken: "98hbieg87-ilulieugil-dilufkucy",
+ *     deviceToken: "iug893-kjg-fiug23"
+  * }, function(err, result) {
+ *     console.log(result);
+ * });
+ */
+exports.status = function pair(params, callback) {
+
+    request({
+        url: ( params.staging ? stagingUrl : apiUrl ) + '/serviceapi/status',
+        method: 'POST',
+        json: true,
+        body: {
+            userId: params.userId,
+            pairId: params.pairId,
+            pairToken: params.pairToken,
+            deviceToken: params.deviceToken
         }
     }, function(err, httpResponse, body) {
         if (err) {
@@ -97,6 +135,7 @@ exports.check = function pair(params, callback) {
         body: {
             userId: params.userId,
             pairId: params.pairId,
+            pairToken: params.pairId,
             deviceToken: params.deviceToken,
             tz: params.tz,
             childId: params.childId,
