@@ -33,6 +33,8 @@ Really, you should be able to add extensive and powerful parental controls to yo
 
 Test Allow2 in your browser: [https://npm.runkit.com/allow2](https://npm.runkit.com/allow2)
 
+Use the staging server to create a parent account and add children: [https://staging.allow2.com/ltr/devices](https://staging.allow2.com/ltr/devices)
+
 # Installation
 
 ```js
@@ -61,6 +63,10 @@ To use this mode, you create a key/secret pair on the Allow2 Developer portal an
 
 # Usage
 
+There are essentially 2 steps to usage:
+
+1. pair with the platform (see the example)
+2. use the "check" routine to check permissions and log usage.
 
 With Allow2 all you have to do to check if something can be used and record it's usage is:
 

@@ -13,8 +13,8 @@ require('ssl-root-cas')
     .addFile(__dirname + '/certs/COMODORSAAddTrustCA.crt')
     .addFile(__dirname + '/certs/AddTrustExternalCARoot.crt');
 
-const apiUrl = 'https://api.allow2.com';
-const stagingUrl = 'https://staging-api.allow2.com';
+const apiUrl = 'https://api.allow2.com:9443'; //'https://api.allow2.com';
+const stagingUrl = 'https://api.allow2.com:9443'; // 'https://staging-api.allow2.com';
 
 var exports = {};
 
@@ -71,6 +71,7 @@ exports.pair = function pair(params, callback) {
  *
  * allow2.status({
  *     userId: 1,
+ *     pairId: 375,
  *     pairToken: "98hbieg87-ilulieugil-dilufkucy",
  *     deviceToken: "iug893-kjg-fiug23"
   * }, function(err, result) {
@@ -110,10 +111,11 @@ exports.status = function pair(params, callback) {
  *
  * allow2.check({
  *     userId: 1,
+ *     pairId: 375
  *     pairToken: "98hbieg87-ilulieugil-dilufkucy",
  *     deviceToken: "iug893-kjg-fiug23",
  *     tz: 'Australia/Brisbane',                    // note: timezone is crucial to correctly calculate allowed times and day types
- *     childId: 10,
+ *     childId: 102,
  *     activities: [ 1, 2 ],
  *     log: true,				    // note: if set, record the usage (log it) and deduct quota, otherwise it only checks the access is permitted.
  *     staging: true                                // note: if set, use the staging environment, not production
@@ -135,7 +137,7 @@ exports.check = function pair(params, callback) {
         body: {
             userId: params.userId,
             pairId: params.pairId,
-            pairToken: params.pairId,
+            pairToken: params.pairToken,
             deviceToken: params.deviceToken,
             tz: params.tz,
             childId: params.childId,
