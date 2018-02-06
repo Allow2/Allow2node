@@ -78,7 +78,12 @@ allow2.check({
     deviceToken: deviceToken,
     tz: 'Australia/Sydney',                    // note: timezone is crucial to correctly calculate allowed times and day types
     childId: pairing.childId,       // MANDATORY!
-    activities: [1, 2, 3, 8],   // 1 = Internet, 2 = Computer, 3 = Gaming, 8 = Screen Time
+    activities: [
+        { id: 1, log: true },		    // 1 = Internet
+        { id: 2, log: true },           // 2 = Conputer
+        { id: 3, log: true },           // 3 = Gaming
+        { id: 8, log: true }            // 8 = Screen Time
+    ],
     log: true,				    // note: if set, record the usage (log it) and deduct quota, otherwise it only checks the access is permitted.
     staging: true               // note: if set, use the staging environment, not production
 }, function(err, result) {
