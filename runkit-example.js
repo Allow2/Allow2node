@@ -4,7 +4,7 @@ var allow2 = require("allow2")
 // start by "pairing" the device or service to the allow2 platform
 //
 // For this, you need a free Allow2 account with an email/password.
-// https://staging.allow2.com
+// https://app.allow2.com
 //
 let email = "parent@email.address.com";         // The parent logs in to Allow2 with this email address
 let password = "parentpassword";                // and this password
@@ -24,13 +24,12 @@ let pairing = {
 // this device token comes from the developer portal to describe your device
 // the one here is valid and you can use it for testing, or replace with your own
 //
-let deviceToken = "jJ5GOIaJ028Ywt6K";
+let deviceToken = "B0hNax6VCFi9vphu";
 
 if (!pairing.token) {
     return allow2.pair({
         user: email,
         pass: password,
-        staging: true,
         deviceToken: deviceToken,
         deviceName: 'Runkit Example Device'
     }, function(err, response){

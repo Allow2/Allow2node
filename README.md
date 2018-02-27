@@ -33,7 +33,7 @@ Really, you should be able to add extensive and powerful parental controls to yo
 
 Test Allow2 in your browser: [https://npm.runkit.com/allow2](https://npm.runkit.com/allow2)
 
-Use the staging server to create a parent account and add children: [https://staging.allow2.com](https://staging.allow2.com)
+Use the Allow2 server to create a parent account and add children: [https://app.allow2.com](https://app.allow2.com)
 
 # Installation
 
@@ -80,7 +80,7 @@ allow2.check({
     childId: 10,
     activities: [ 1, 2 ],
     log: true                   // use this to say you want usage recorded (logged) as well as checked
-    //, staging: true           // specify staging environment (default is production)
+    //, staging: true           // specify staging environment (BETA - use at your OWN risk)
 }, function(err, result) {
     ... // this is the callback with results of the check
 });

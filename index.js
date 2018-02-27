@@ -7,14 +7,14 @@
 var request = require('request');
 var async = require('async');
 
-require('ssl-root-cas')
+require('ssl-root-cas/latest')
     .inject()
     .addFile(__dirname + '/certs/COMODORSADomainValidationSecureServerCA.crt')
     .addFile(__dirname + '/certs/COMODORSAAddTrustCA.crt')
     .addFile(__dirname + '/certs/AddTrustExternalCARoot.crt');
 
-const apiUrl = 'https://api.allow2.com:9443'; //'https://api.allow2.com';
-const stagingUrl = 'https://api.allow2.com:9443'; // 'https://staging-api.allow2.com';
+const apiUrl = 'https://api.allow2.com';
+const stagingUrl = 'https://staging-api.allow2.com';
 
 var exports = {};
 
@@ -60,45 +60,6 @@ exports.pair = function pair(params, callback) {
 };
 
 /**
- * Status routine, call this to get current status of this connection and relevant important information
- * currently returns only the list of children (so if a new child is added, the device can see that new child.
- *
- * @name status
- * @static
- * @param {Object} params - An object containing the userId, pairToken and deviceToken for checking status
- * @param callback
- * @example
- *
- * allow2.status({
- *     userId: 1,
- *     pairId: 375,
- *     pairToken: "98hbieg87-ilulieugil-dilufkucy",
- *     deviceToken: "iug893-kjg-fiug23"
-  * }, function(err, result) {
- *     console.log(result);
- * });
- */
-exports.status = function pair(params, callback) {
-
-    request({
-        url: ( params.staging ? stagingUrl : apiUrl ) + '/serviceapi/status',
-        method: 'POST',
-        json: true,
-        body: {
-            userId: params.userId,
-            pairId: params.pairId,
-            pairToken: params.pairToken,
-            deviceToken: params.deviceToken
-        }
-    }, function(err, httpResponse, body) {
-        if (err) {
-            return callback(err);
-        }
-        return callback(null, body);
-    });
-};
-
-/**
  * Check routine, call this to get an immediate response on accessibility and record usage. This is fail-resistant as it uses a cached last value
  * and can be called as often as you like, but it will rate-limit calls to the web server regardless.
  * In the event it cannot connect, it will allow grace access blah blah...
@@ -110,12 +71,16 @@ exports.status = function pair(params, callback) {
  * @example
  *
  * allow2.check({
+ *******************      OPTION 1: Device Check
  *     userId: 1,
- *     pairId: 375
  *     pairToken: "98hbieg87-ilulieugil-dilufkucy",
  *     deviceToken: "iug893-kjg-fiug23",
+ *******************      OPTION 2: Service Check
+ *     token: 4ecf0c4e-defd-4c22-8e7c-2b3620053fa8,
+ *     secret: 4ecf0c4e-defd-4c22-8e7c-2b3620053fa8,
+ *******************
  *     tz: 'Australia/Brisbane',                    // note: timezone is crucial to correctly calculate allowed times and day types
- *     childId: 102,
+ *     childId: 10,
  *     activities: [ 1, 2 ],
  *     log: true,				    // note: if set, record the usage (log it) and deduct quota, otherwise it only checks the access is permitted.
  *     staging: true                                // note: if set, use the staging environment, not production
@@ -137,7 +102,6 @@ exports.check = function pair(params, callback) {
         body: {
             userId: params.userId,
             pairId: params.pairId,
-            pairToken: params.pairToken,
             deviceToken: params.deviceToken,
             tz: params.tz,
             childId: params.childId,
