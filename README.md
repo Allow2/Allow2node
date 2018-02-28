@@ -19,15 +19,19 @@ Allow2 makes it easy to add parental controls to your apps.
 
 # Why should you use Allow2?
 
-Parental controls are incredibly complex and difficult to get correct and for a parent, there is nothing worse than having to log in or open up yet another parental control interface on another app and reconfigure it every other day.
+We remove friction and barriers to entry. Parents are scared of technology and not being able to avoid screen-time addiction or have their children gaming instead of doing homework and chores. GIVE THEM the ability to be in control which will INCREASE your user base and INCREASE your paying users.
 
-Allow2 solves the problem once and for all:
+But good parental controls are incredibly complex and difficult to get correct, and for a parent there is nothing worse than having to log in or open up yet another parental control interface on another app and reconfigure it every other day.
+
+Allow2 solves these problems once and for all:
 
 1. Leverage the powerful Allow2 platform completely for free (no developer licensing fees)
 2. Add parental controls in a matter of hours and don't worry about implementing heaps of interfaces.
 3. Show your community responsibility and support parents, this helps to bring more users to your apps.
 
 Really, you should be able to add extensive and powerful parental controls to your apps in a matter of hours or (at most) a couple of days.
+
+The best part is it's not only powerful, but completely free for developers and manufacturers.
 
 # Try it out
 
