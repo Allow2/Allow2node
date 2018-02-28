@@ -78,7 +78,12 @@ allow2.check({
     deviceToken: "iug893-kjg-fiug23",
     tz: 'Australia/Brisbane', // note, timezone is crucial to correctly calculate allowed times and day types
     childId: 10,
-    activities: [ 1, 2 ],
+    activities: [
+        { id: 1, log: true },		    // 1 = Internet
+        { id: 2, log: true },           // 2 = Conputer
+        { id: 3, log: true },           // 3 = Gaming
+        { id: 8, log: true }            // 8 = Screen Time - see all "activities" at https://developer.allow2.com
+    ],
     log: true                   // use this to say you want usage recorded (logged) as well as checked
     //, staging: true           // specify staging environment (BETA - use at your OWN risk)
 }, function(err, result) {
@@ -111,12 +116,5 @@ function callback(err, result) {
 
 # Playing
 
-You can "play" with the library first using the following commands:
-
-```js
-TBA
-```
-
-# Todo
-
-* switch from pair and device ids to tokens.
+The best way to 'play' with the sdk and get familiar with it is via the runkit:
+https://npm.runkit.com/allow2
