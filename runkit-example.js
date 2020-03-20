@@ -83,8 +83,7 @@ allow2.check({
         { id: 3, log: true },           // 3 = Gaming
         { id: 8, log: true }            // 8 = Screen Time
     ],
-    log: true,				    // note: if set, record the usage (log it) and deduct quota, otherwise it only checks the access is permitted.
-    staging: true               // note: if set, use the staging environment, not production
+    log: true				    // note: if set, record the usage (log it) and deduct quota, otherwise it only checks the access is permitted.
 }, function(err, result) {
     console.log('result from Allow2 check:', result);
 });
