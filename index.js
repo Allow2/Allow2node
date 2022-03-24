@@ -5,13 +5,6 @@
  */
 
 var request = require('request');
-var async = require('async');
-
-require('ssl-root-cas/latest')
-    .inject()
-    .addFile(__dirname + '/certs/COMODORSADomainValidationSecureServerCA.crt')
-    .addFile(__dirname + '/certs/COMODORSAAddTrustCA.crt')
-    .addFile(__dirname + '/certs/AddTrustExternalCARoot.crt');
 
 const apiUrl = 'https://api.allow2.com';
 const stagingUrl = 'https://staging-api.allow2.com';
