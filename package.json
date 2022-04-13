@@ -30,7 +30,7 @@
   "author": "Allow2 Pty Ltd",
   "license": "SEE LICENSE IN LICENSE FILE",
   "dependencies": {
-    "async": "^2.6.0",
+    "async": "^3.2.2",
     "co-prompt": "^1.0.0",
     "commander": "^2.13.0",
     "request": "^2.79.0"
