@@ -1,0 +1,34 @@
+{
+  "name": "allow2",
+  "version": "2.0.0-alpha.1",
+  "description": "Allow2 Device SDK — parental controls for apps and devices",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "node --test tests/",
+    "lint": "eslint src/"
+  },
+  "keywords": [
+    "parental-controls",
+    "allow2",
+    "screen-time",
+    "device-management",
+    "child-safety"
+  ],
+  "homepage": "https://github.com/Allow2/allow2node",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Allow2/allow2node.git"
+  },
+  "author": "Allow2 Pty Ltd",
+  "license": "SEE LICENSE IN LICENSE FILE",
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}
