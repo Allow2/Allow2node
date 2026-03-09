@@ -514,9 +514,10 @@ export class DeviceDaemon extends EventEmitter {
             api: this._api,
             credentialBackend: this._credentialBackend,
             port: this._pairingPort,
+            deviceName: this._deviceName,
         });
 
-        const self = this;
+        var self = this;
 
         this._pairingWizard.on('paired', function (credentials) {
             self._pairingWizard = null;
@@ -528,16 +529,16 @@ export class DeviceDaemon extends EventEmitter {
         });
 
         try {
-            const info = await this._pairingWizard.start();
+            var info = await this._pairingWizard.start();
 
-            // Emit event so platform layer can show the PIN
-            // In Desktop Mode: open browser to info.url
-            // In Game Mode: show PIN on SDL2 overlay
+            // Emit event so platform layer can show the PIN and QR code
+            // qrUrl is the deep link: https://app.allow2.com/pair?pin=XXXXXX
             this.emit('pairing-required', {
                 wizard: this._pairingWizard,
                 pin: info.pin,
                 port: info.port,
                 url: info.url,
+                qrUrl: info.qrUrl,
             });
         } catch (err) {
             this.emit('pairing-error', err);

@@ -1,17 +1,20 @@
 /**
  * Pairing Wizard
  *
- * Serves a local web UI for one-time device pairing.
+ * Manages one-time device pairing with the Allow2 platform.
  * Parents NEVER enter credentials on the child's device.
  *
  * Flow:
- * 1. Wizard starts Express server on localhost
- * 2. Generates a 6-digit PIN and displays it on the web page
- * 3. Parent opens Allow2 app on their phone, enters the PIN (or scans QR code)
- * 4. Server receives callback when parent confirms from their phone
- * 5. On confirmation, receives pairing data (userId, pairToken, children) from callback
- * 6. Stores credentials via the credential backend
- * 7. Shuts down Express server
+ * 1. Wizard calls API to register a pairing session (initPINPairing)
+ * 2. API returns a server-assigned PIN and session ID
+ * 3. Device displays the PIN (and QR code deep link) to the user
+ * 4. Parent opens Allow2 app on their phone, enters the PIN (or scans QR code)
+ * 5. Wizard polls checkPairingStatus until parent confirms
+ * 6. On confirmation, receives credentials (userId, pairId, pairToken, children)
+ * 7. Stores credentials via the credential backend
+ *
+ * Optionally starts a local Express server on localhost for a web UI
+ * showing the PIN — this is a convenience, not required for pairing.
  */
 
 import { EventEmitter } from 'node:events';
@@ -25,62 +28,113 @@ export class PairingWizard extends EventEmitter {
      * @param {import('./api.js').Allow2Api} options.api
      * @param {object} options.credentialBackend - { store(creds), load(), clear() }
      * @param {number} [options.port=3000]
+     * @param {string} [options.deviceName] - Human-readable device name
+     * @param {string} [options.uuid] - Persistent device UUID (generated if not provided)
      */
     constructor(options) {
         super();
         this._api = options.api;
         this._credentialBackend = options.credentialBackend;
         this._port = options.port || 3000;
+        this._deviceName = options.deviceName || 'Linux PC';
+        this._uuid = options.uuid || null;
 
         this._pin = null;
+        this._sessionId = null;
         this._paired = false;
         this._pairingResult = null;
         this._server = null;
         this._app = null;
+        this._pollTimer = null;
+        this._qrUrl = null;
     }
 
     /**
-     * Start the Express server, generate a PIN, and begin listening.
-     * @returns {Promise<{ pin: string, port: number, url: string }>}
+     * Start the pairing flow:
+     * 1. Register with the Allow2 API to get a server-assigned PIN
+     * 2. Optionally start a local Express server for the web UI
+     * 3. Begin polling for parent confirmation
+     *
+     * @returns {Promise<{ pin: string, port: number, url: string, qrUrl: string }>}
      */
     async start() {
-        this._pin = _generatePin();
         this._paired = false;
         this._pairingResult = null;
 
-        this._app = express();
-        this._app.use(express.json());
+        // Generate or reuse device UUID
+        if (!this._uuid) {
+            this._uuid = await this._loadOrCreateUuid();
+        }
 
-        this._setupRoutes();
+        // Register pairing session with the Allow2 API
+        var apiResult;
+        try {
+            console.log('[pairing] Calling initPINPairing (uuid=' + this._uuid + ', device=' + this._deviceName + ')');
+            apiResult = await this._api.initPINPairing({
+                uuid: this._uuid,
+                deviceName: this._deviceName,
+            });
+            console.log('[pairing] API response: ' + JSON.stringify(apiResult));
+        } catch (err) {
+            // If the API call fails, fall back to local-only PIN mode
+            // (e.g., API unreachable, VID not configured yet)
+            console.warn('[pairing] API initPINPairing failed: ' + (err.message || err)
+                + ' — falling back to local PIN mode');
+            apiResult = null;
+        }
 
-        return new Promise((resolve, reject) => {
-            try {
-                this._server = this._app.listen(this._port, () => {
-                    const info = {
-                        pin: this._pin,
-                        port: this._port,
-                        url: 'http://localhost:' + this._port,
-                    };
-                    this.emit('started', { pin: this._pin, port: this._port });
-                    resolve(info);
-                });
+        if (apiResult && apiResult.pin) {
+            // Use server-assigned PIN and session ID
+            this._pin = String(apiResult.pin);
+            this._sessionId = apiResult.sessionId || apiResult.pairingSessionId || null;
+            console.log('[pairing] Using server PIN: ' + this._pin + ' (session=' + this._sessionId + ')');
+        } else {
+            // Fallback: generate local PIN (won't work without API registration,
+            // but at least shows something to the user)
+            this._pin = _generatePin();
+            this._sessionId = null;
+            console.warn('[pairing] Using local PIN (no API session): ' + this._pin);
+        }
 
-                this._server.on('error', (err) => {
-                    this.emit('error', err);
-                    reject(err);
-                });
-            } catch (err) {
-                this.emit('error', err);
-                reject(err);
-            }
-        });
+        // Build QR deep link URL
+        this._qrUrl = 'https://app.allow2.com/pair?pin=' + this._pin;
+
+        // Start local Express server for web UI (optional, non-fatal if port busy)
+        var port = this._port;
+        try {
+            await this._startExpress();
+        } catch (err) {
+            console.warn('[pairing] Express server failed on port ' + port + ': '
+                + (err.message || err) + ' — pairing still works via PIN/QR');
+            this._server = null;
+            this._app = null;
+        }
+
+        // Start polling for pairing completion (if we have a session ID)
+        if (this._sessionId) {
+            this._startPolling();
+        }
+
+        var info = {
+            pin: this._pin,
+            port: port,
+            url: 'http://localhost:' + port,
+            qrUrl: this._qrUrl,
+        };
+        this.emit('started', { pin: this._pin, port: port, qrUrl: this._qrUrl });
+        return info;
     }
 
     /**
-     * Shut down the Express server.
+     * Shut down: stop polling, stop Express server.
      * @returns {Promise<void>}
      */
     async stop() {
+        if (this._pollTimer) {
+            clearInterval(this._pollTimer);
+            this._pollTimer = null;
+        }
+
         if (!this._server) return;
 
         return new Promise((resolve) => {
@@ -101,11 +155,18 @@ export class PairingWizard extends EventEmitter {
     }
 
     /**
-     * Called when the server receives pairing confirmation from Allow2.
-     * The Allow2 server sends the credentials directly in the callback.
+     * Return the QR deep link URL.
+     * @returns {string|null}
+     */
+    getQrUrl() {
+        return this._qrUrl;
+    }
+
+    /**
+     * Called when pairing is confirmed (either via API polling or local callback).
      * Stores credentials via the credential backend and emits 'paired'.
      *
-     * @param {object} pairingData - Data received from the Allow2 callback
+     * @param {object} pairingData - Data received from the Allow2 API
      * @param {number} pairingData.userId - Controller's user ID
      * @param {number} pairingData.pairId - Pairing ID
      * @param {string} pairingData.pairToken - Pairing token for subsequent API calls
@@ -117,7 +178,7 @@ export class PairingWizard extends EventEmitter {
                 throw new Error('Pairing callback missing required fields (userId, pairId, pairToken)');
             }
 
-            const credentials = {
+            var credentials = {
                 userId: pairingData.userId,
                 pairId: pairingData.pairId,
                 pairToken: pairingData.pairToken,
@@ -136,7 +197,7 @@ export class PairingWizard extends EventEmitter {
                 children: credentials.children,
             });
 
-            // Auto-terminate the wizard server after successful pairing
+            // Auto-terminate the wizard after successful pairing
             await this.stop();
 
             return credentials;
@@ -148,41 +209,119 @@ export class PairingWizard extends EventEmitter {
 
     // ── Internal ──────────────────────────────────────────────
 
+    /**
+     * Load existing device UUID from credential backend, or create one.
+     */
+    async _loadOrCreateUuid() {
+        try {
+            var creds = await this._credentialBackend.load();
+            if (creds && creds.uuid) {
+                return creds.uuid;
+            }
+        } catch (_err) { /* no creds yet */ }
+
+        // Generate and persist a new UUID
+        var uuid = crypto.randomUUID();
+        try {
+            // Store just the UUID for now (credentials will be overwritten on pairing)
+            await this._credentialBackend.store({ uuid: uuid });
+        } catch (_err) { /* best effort */ }
+        return uuid;
+    }
+
+    /**
+     * Start polling the Allow2 API for pairing confirmation.
+     */
+    _startPolling() {
+        if (this._pollTimer) return;
+
+        var self = this;
+        var pollCount = 0;
+        var maxPolls = 360; // 30 minutes at 5s intervals
+
+        this._pollTimer = setInterval(function () {
+            if (self._paired) {
+                clearInterval(self._pollTimer);
+                self._pollTimer = null;
+                return;
+            }
+
+            pollCount++;
+            if (pollCount > maxPolls) {
+                clearInterval(self._pollTimer);
+                self._pollTimer = null;
+                self.emit('error', new Error('Pairing timed out after 30 minutes'));
+                return;
+            }
+
+            self._api.checkPairingStatus(self._sessionId).then(function (result) {
+                if (result && result.paired && result.userId && result.pairId && result.pairToken) {
+                    self.completePairing(result);
+                }
+            }).catch(function (err) {
+                // Polling errors are non-fatal — just retry next interval
+                if (pollCount % 12 === 0) { // log every minute
+                    console.warn('[pairing] Poll error:', err.message);
+                }
+            });
+        }, 5000);
+    }
+
+    /**
+     * Start the local Express server for the web UI.
+     */
+    _startExpress() {
+        var self = this;
+        this._app = express();
+        this._app.use(express.json());
+        this._setupRoutes();
+
+        return new Promise(function (resolve, reject) {
+            try {
+                self._server = self._app.listen(self._port, function () {
+                    resolve();
+                });
+
+                self._server.on('error', function (err) {
+                    reject(err);
+                });
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
     _setupRoutes() {
+        var self = this;
+
         // GET / — Serve the pairing page
-        this._app.get('/', (_req, res) => {
-            res.type('html').send(_buildPairingPage(this._pin, this._port));
+        this._app.get('/', function (_req, res) {
+            res.type('html').send(_buildPairingPage(self._pin, self._port, self._qrUrl));
         });
 
         // GET /status — Polling endpoint for the web page
-        this._app.get('/status', (_req, res) => {
+        this._app.get('/status', function (_req, res) {
             res.json({
-                paired: this._paired,
-                result: this._paired ? { userId: this._pairingResult.userId } : null,
+                paired: self._paired,
+                result: self._paired ? { userId: self._pairingResult.userId } : null,
             });
         });
 
-        // POST /pair-callback — Receive pairing data from Allow2 server
-        this._app.post('/pair-callback', async (req, res) => {
-            if (this._paired) {
+        // POST /pair-callback — Receive pairing data from Allow2 server (legacy callback)
+        this._app.post('/pair-callback', async function (req, res) {
+            if (self._paired) {
                 res.status(409).json({ error: 'Already paired' });
                 return;
             }
 
-            const body = req.body;
+            var body = req.body;
             if (!body || !body.userId || !body.pairId || !body.pairToken) {
                 res.status(400).json({ error: 'Missing required fields (userId, pairId, pairToken)' });
                 return;
             }
 
-            // PIN verification is mandatory
-            if (!body.pin || body.pin !== this._pin) {
-                res.status(403).json({ error: 'PIN mismatch' });
-                return;
-            }
-
             try {
-                const credentials = await this.completePairing(body);
+                var credentials = await self.completePairing(body);
                 res.json({ success: true, userId: credentials.userId });
             } catch (err) {
                 res.status(500).json({ error: err.message || 'Pairing failed' });
@@ -190,7 +329,7 @@ export class PairingWizard extends EventEmitter {
         });
 
         // GET /success — Success confirmation page
-        this._app.get('/success', (_req, res) => {
+        this._app.get('/success', function (_req, res) {
             res.type('html').send(_buildSuccessPage());
         });
     }
@@ -203,28 +342,20 @@ export class PairingWizard extends EventEmitter {
  * @returns {string}
  */
 function _generatePin() {
-    // Generate a number between 0 and 999999, zero-padded to 6 digits
-    const num = crypto.randomInt(0, 1000000);
+    var num = crypto.randomInt(0, 1000000);
     return String(num).padStart(6, '0');
-}
-
-/**
- * Generate a random UUID v4 for the device.
- * @returns {string}
- */
-function _generateUUID() {
-    return crypto.randomUUID();
 }
 
 /**
  * Build the self-contained HTML pairing page.
  * @param {string} pin
  * @param {number} port
+ * @param {string} qrUrl
  * @returns {string}
  */
-function _buildPairingPage(pin, port) {
+function _buildPairingPage(pin, port, qrUrl) {
     // Split PIN into individual digits for display
-    const digits = pin.split('').map(function(d) {
+    var digits = pin.split('').map(function(d) {
         return '<span class="digit">' + d + '</span>';
     }).join('');
 
