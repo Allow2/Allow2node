@@ -5,6 +5,8 @@ on:
     branches:
       - master
       - v2.0.0-alpha
+    tags:
+      - 'v*'
   pull_request:
     branches: [master]
   workflow_dispatch:
@@ -25,75 +27,47 @@ jobs:
 
   publish:
     needs: test
-    if: github.event_name == 'push'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
-
       - run: npm ci
 
-      # Determine dist-tag from branch
+      # Determine dist-tag from version string
+      # v2.0.0-alpha.3 → alpha, v2.0.0-beta.1 → beta, v2.0.0 → latest
       - name: Determine npm tag
         id: tag
         run: |
-          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            echo "dist_tag=latest" >> $GITHUB_OUTPUT
-          else
+          VERSION=${GITHUB_REF#refs/tags/v}
+          if echo "$VERSION" | grep -q "alpha"; then
             echo "dist_tag=alpha" >> $GITHUB_OUTPUT
-          fi
-
-      # Auto-increment version if it already exists on npm
-      - name: Bump version if needed
-        run: |
-          CURRENT=$(node -p "require('./package.json').version")
-          TAG=${{ steps.tag.outputs.dist_tag }}
-
-          # Check if this exact version is already published
-          if npm view "allow2@${CURRENT}" version 2>/dev/null; then
-            echo "Version ${CURRENT} already published, bumping prerelease..."
-            # Get the highest published alpha version
-            LATEST_ALPHA=$(npm view allow2 versions --json 2>/dev/null | node -p "
-              JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'))
-                .filter(v => v.startsWith('2.0.0-alpha'))
-                .sort((a,b) => {
-                  const na = parseInt(a.split('.').pop()) || 0;
-                  const nb = parseInt(b.split('.').pop()) || 0;
-                  return nb - na;
-                })[0] || '2.0.0-alpha.0'
-            ")
-            # Increment: 2.0.0-alpha.N → 2.0.0-alpha.(N+1)
-            NEXT=$(node -p "
-              const parts = '${LATEST_ALPHA}'.split('.');
-              const n = parseInt(parts.pop()) || 0;
-              parts.concat([n + 1]).join('.')
-            ")
-            echo "Bumping to ${NEXT}"
-            npm version "${NEXT}" --no-git-tag-version
+          elif echo "$VERSION" | grep -q "beta"; then
+            echo "dist_tag=beta" >> $GITHUB_OUTPUT
+          elif echo "$VERSION" | grep -q "rc"; then
+            echo "dist_tag=next" >> $GITHUB_OUTPUT
           else
-            echo "Version ${CURRENT} not yet published, using as-is"
+            echo "dist_tag=latest" >> $GITHUB_OUTPUT
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      # Verify package.json version matches the tag
+      - name: Verify version
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION=${{ steps.tag.outputs.version }}
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::package.json version ($PKG_VERSION) does not match tag (v$TAG_VERSION)"
+            exit 1
           fi
 
       - name: Publish to npm
         run: npm publish --access public --tag ${{ steps.tag.outputs.dist_tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      # Commit the version bump back so next run knows the current version
-      - name: Push version bump
-        run: |
-          PUBLISHED=$(node -p "require('./package.json').version")
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git diff --cached --quiet || git commit -m "chore: bump version to ${PUBLISHED} [skip ci]"
-          git push
