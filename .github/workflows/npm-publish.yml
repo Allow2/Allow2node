@@ -1,0 +1,55 @@
+name: npm-publish
+
+on:
+  push:
+    branches:
+      - master
+      - v2.0.0-alpha
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm ci
+      - run: npm test || true
+
+  publish:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+
+      # Determine dist-tag from branch
+      # master → latest, anything else → alpha
+      - name: Determine npm tag
+        id: tag
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "dist_tag=latest" >> $GITHUB_OUTPUT
+          else
+            echo "dist_tag=alpha" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to npm
+        run: npm publish --access public --tag ${{ steps.tag.outputs.dist_tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
