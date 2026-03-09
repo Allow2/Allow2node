@@ -61,4 +61,36 @@ export class PlaintextBackend {
             }
         }
     }
+
+    /**
+     * Load last-used timestamps for all children.
+     *
+     * @returns {Promise<object>} Map of childId (string) to ISO timestamp string, or {} if missing/corrupt
+     */
+    async loadLastUsed() {
+        var lastUsedPath = path.join(path.dirname(this._path), 'last-used.json');
+        try {
+            var raw = await fs.readFile(lastUsedPath, 'utf8');
+            return JSON.parse(raw);
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                return {};
+            }
+            return {};
+        }
+    }
+
+    /**
+     * Update the last-used timestamp for a specific child.
+     *
+     * @param {number|string} childId - The child ID to update
+     */
+    async updateLastUsed(childId) {
+        var lastUsedPath = path.join(path.dirname(this._path), 'last-used.json');
+        var data = await this.loadLastUsed();
+        data[String(childId)] = new Date().toISOString();
+        var dir = path.dirname(lastUsedPath);
+        await fs.mkdir(dir, { recursive: true, mode: 0o700 });
+        await fs.writeFile(lastUsedPath, JSON.stringify(data, null, 2), { mode: 0o600 });
+    }
 }

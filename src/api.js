@@ -18,8 +18,8 @@ const DEFAULT_API_URL = 'https://api.allow2.com';
 
 // Default production VID/Token for allow2linux.
 // Register your own at https://developer.allow2.com for other integrations.
-const DEFAULT_VID = 0;       // TODO: register allow2linux and set production VID
-const DEFAULT_TOKEN = '';     // TODO: register allow2linux and set production token
+const DEFAULT_VID = 0;
+const DEFAULT_TOKEN = '';
 
 export class Allow2Api {
 
@@ -199,6 +199,88 @@ export class Allow2Api {
             },
         });
     }
+
+    // ----------------------------------------------------------------
+    // Feedback
+    // ----------------------------------------------------------------
+
+    /**
+     * Submit feedback from a device/child to the Allow2 server.
+     *
+     * @param {object} params
+     * @param {number} params.userId
+     * @param {number} params.pairId
+     * @param {string} params.pairToken
+     * @param {number} [params.childId]
+     * @param {number} [params.vid]
+     * @param {string} params.category - One of: bypass, missing_feature, not_working, question, other
+     * @param {string} params.message
+     * @param {object} [params.deviceContext]
+     * @returns {Promise<{ discussionId: string }>}
+     */
+    async submitFeedback(params) {
+        return this._fetch('/api/feedback/submit', {
+            method: 'POST',
+            body: JSON.stringify({
+                userId: params.userId,
+                pairId: params.pairId,
+                pairToken: params.pairToken,
+                childId: params.childId,
+                vid: params.vid || this.vid,
+                category: params.category,
+                message: params.message,
+                deviceContext: params.deviceContext,
+            }),
+        });
+    }
+
+    /**
+     * Load feedback discussions for a device.
+     *
+     * @param {object} params
+     * @param {number} params.userId
+     * @param {number} params.pairId
+     * @param {string} params.pairToken
+     * @returns {Promise<{ discussions: Array }>}
+     */
+    async loadFeedback(params) {
+        return this._fetch('/api/feedback/load', {
+            method: 'POST',
+            body: JSON.stringify({
+                userId: params.userId,
+                pairId: params.pairId,
+                pairToken: params.pairToken,
+            }),
+        });
+    }
+
+    /**
+     * Reply to an existing feedback discussion.
+     *
+     * @param {object} params
+     * @param {number} params.userId
+     * @param {number} params.pairId
+     * @param {string} params.pairToken
+     * @param {string} params.discussionId
+     * @param {string} params.message
+     * @returns {Promise<{ messageId: string }>}
+     */
+    async feedbackReply(params) {
+        return this._fetch('/api/feedback/reply', {
+            method: 'POST',
+            body: JSON.stringify({
+                userId: params.userId,
+                pairId: params.pairId,
+                pairToken: params.pairToken,
+                discussionId: params.discussionId,
+                message: params.message,
+            }),
+        });
+    }
+
+    // ----------------------------------------------------------------
+    // Usage Logging
+    // ----------------------------------------------------------------
 
     /**
      * Log usage explicitly (e.g., reconcile after offline period).

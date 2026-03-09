@@ -2,9 +2,11 @@
  * DeviceDaemon — Main entry point for the Allow2 Device SDK.
  *
  * Manages the full device lifecycle:
- *   1. Unpaired   → emits 'pairing-required' (caller shows pairing UI)
- *   2. Paired     → emits 'child-select-required' (caller shows child selector)
- *   3. Child ID'd → begins periodic permission checks, warnings, enforcement
+ *   1. Unpaired   → sits idle, waits for openApp() to start pairing
+ *   2. Pairing    → pairing wizard active
+ *   3. Paired     → paired but no child selected yet
+ *   4. Enforcing  → child selected, check loop running
+ *   5. Parent     → parent mode, no enforcement
  *
  * The daemon never throws on missing credentials — it emits events so the
  * platform layer (allow2linux, etc.) can show the appropriate UI.
@@ -16,11 +18,13 @@
  *       credentialBackend: myBackend,
  *       childResolver: myResolver,
  *   });
- *   daemon.on('pairing-required', (wizard) => showPairingUI(wizard));
  *   daemon.on('child-select-required', (children) => showSelector(children));
  *   daemon.on('warning', (w) => showWarning(w));
  *   daemon.on('soft-lock', () => lockScreen());
+ *   daemon.on('unpaired', () => showUnpairedUI());
  *   await daemon.start();
+ *   // When user opens the Allow2 app:
+ *   await daemon.openApp();
  */
 
 import { EventEmitter } from 'node:events';
@@ -79,6 +83,9 @@ export class DeviceDaemon extends EventEmitter {
         this._childId = null;
         this._running = false;
         this._pairingWizard = null;
+
+        /** @type {'unpaired'|'pairing'|'paired'|'enforcing'|'parent'} */
+        this._state = 'unpaired';
     }
 
     /** The Allow2Api instance (for advanced usage like createRequest). */
@@ -106,6 +113,16 @@ export class DeviceDaemon extends EventEmitter {
         return !!(this._credentials && this._credentials.pairId && this._credentials.pairToken);
     }
 
+    /** Current daemon state: 'unpaired', 'pairing', 'paired', 'enforcing', or 'parent'. */
+    get state() {
+        return this._state;
+    }
+
+    /** Whether the daemon is in parent mode (no enforcement). */
+    get isParentMode() {
+        return this._state === 'parent';
+    }
+
     // ----------------------------------------------------------------
     // Lifecycle
     // ----------------------------------------------------------------
@@ -114,7 +131,7 @@ export class DeviceDaemon extends EventEmitter {
      * Start the daemon.
      *
      * Checks for stored credentials:
-     * - If unpaired → emits 'pairing-required' with { wizard, pin, port, url }
+     * - If unpaired → sits idle, logs message, waits for openApp()
      * - If paired   → proceeds to child identification and enforcement
      */
     async start() {
@@ -129,13 +146,15 @@ export class DeviceDaemon extends EventEmitter {
             this._credentials = null;
         }
 
-        // 2. If not paired, start pairing flow
+        // 2. If not paired, sit idle and wait for openApp()
         if (!this._credentials || !this._credentials.pairId || !this._credentials.pairToken) {
-            await this._startPairing();
-            return; // Pairing wizard will call _onPaired() when done
+            this._state = 'unpaired';
+            console.log('Device not paired. Waiting for user to open Allow2 app.');
+            return;
         }
 
         // 3. Already paired — proceed to child identification
+        this._state = 'paired';
         await this._beginEnforcement();
     }
 
@@ -153,6 +172,47 @@ export class DeviceDaemon extends EventEmitter {
             this._pairingWizard = null;
         }
         this._childId = null;
+
+        // Reset state based on whether we have credentials
+        if (this._credentials && this._credentials.pairId) {
+            this._state = 'paired';
+        } else {
+            this._state = 'unpaired';
+        }
+    }
+
+    /**
+     * Called when the user opens the Allow2 app / UI.
+     *
+     * If unpaired, starts the pairing flow.
+     * If already paired, emits status info for the UI to display.
+     */
+    async openApp() {
+        if (this._state === 'unpaired' || (!this._credentials || !this._credentials.pairId)) {
+            // Start pairing flow
+            await this._startPairing();
+        } else {
+            // Already paired — emit status info
+            this.emit('status-requested', {
+                state: this._state,
+                children: (this._credentials && this._credentials.children) || [],
+                currentChildId: this._childId,
+                // remaining time will be filled by checker if available
+                remaining: this._checker ? this._checker.getRemaining() : null,
+            });
+        }
+    }
+
+    /**
+     * Enter parent mode: stops enforcement, no restrictions applied.
+     */
+    enterParentMode() {
+        if (this._checker) {
+            this._checker.stop();
+            this._checker = null;
+        }
+        this._state = 'parent';
+        this.emit('parent-mode', {});
     }
 
     /**
@@ -182,7 +242,10 @@ export class DeviceDaemon extends EventEmitter {
         }
 
         this._childId = childId;
+        this._state = 'enforcing';
         this.emit('child-selected', { childId: childId, name: name || null });
+
+        this._updateLastUsed(childId);
 
         if (this._running && this._credentials) {
             this._startChecker();
@@ -216,6 +279,7 @@ export class DeviceDaemon extends EventEmitter {
             this._checker = null;
         }
         this._childId = null;
+        this._state = 'paired';
         this.emit('session-timeout', {});
 
         // Re-resolve child
@@ -282,10 +346,170 @@ export class DeviceDaemon extends EventEmitter {
     }
 
     // ----------------------------------------------------------------
+    // Feedback
+    // ----------------------------------------------------------------
+
+    /**
+     * Whether the current session user can submit feedback.
+     * Returns true if the user has an Allow2 account (parent mode, or
+     * child with a linked user account).
+     */
+    get canSubmitFeedback() {
+        // Parent mode: always true (parent has an account by definition)
+        if (this._state === 'parent') return true;
+
+        // Must be paired with credentials
+        if (!this._credentials || !this._credentials.userId) return false;
+
+        // If a child is selected, check if they have a linked account
+        if (this._childId && this._credentials.children) {
+            var children = this._credentials.children;
+            for (var i = 0; i < children.length; i++) {
+                var child = children[i];
+                if ((child.id || child.childId) === this._childId) {
+                    // Child with linked user account can submit
+                    return !!(child.LinkedUserId || child.linkedUserId);
+                }
+            }
+            return false; // child not found
+        }
+
+        // Paired with userId = parent context
+        return !!this._credentials.userId;
+    }
+
+    /**
+     * Submit feedback to the Allow2 server.
+     *
+     * @param {object} params
+     * @param {string} params.category - One of: bypass, missing_feature, not_working, question, other
+     * @param {string} params.message  - Feedback message text
+     * @param {object} [params.deviceContext] - Optional override for device context fields
+     * @returns {Promise<{ discussionId: string }>}
+     */
+    async submitFeedback(params) {
+        if (!this.canSubmitFeedback) {
+            throw new Error('Cannot submit feedback: no account associated');
+        }
+        if (!params || !params.category || !params.message) {
+            throw new Error('category and message are required');
+        }
+
+        var validCategories = ['bypass', 'missing_feature', 'not_working', 'question', 'other'];
+        if (validCategories.indexOf(params.category) === -1) {
+            throw new Error('Invalid category. Must be one of: ' + validCategories.join(', '));
+        }
+
+        var context = {
+            deviceName: this._deviceName,
+            platform: 'unknown',
+            sdkVersion: '2.0.0',
+            productName: 'allow2',
+        };
+        if (params.deviceContext) {
+            if (params.deviceContext.deviceName) context.deviceName = params.deviceContext.deviceName;
+            if (params.deviceContext.platform) context.platform = params.deviceContext.platform;
+            if (params.deviceContext.sdkVersion) context.sdkVersion = params.deviceContext.sdkVersion;
+            if (params.deviceContext.productName) context.productName = params.deviceContext.productName;
+        }
+
+        var result = await this._api.submitFeedback({
+            userId: this._credentials.userId,
+            pairId: this._credentials.pairId,
+            pairToken: this._credentials.pairToken,
+            childId: this._childId,
+            vid: this._api.vid,
+            category: params.category,
+            message: params.message,
+            deviceContext: context,
+        });
+
+        this.emit('feedback-submitted', {
+            discussionId: result.discussionId,
+            category: params.category,
+        });
+
+        return result;
+    }
+
+    /**
+     * Load all feedback discussions for this device.
+     *
+     * @returns {Promise<{ discussions: Array }>}
+     */
+    async loadDeviceFeedback() {
+        if (!this._credentials || !this._credentials.pairId) {
+            throw new Error('Device not paired');
+        }
+
+        var result = await this._api.loadFeedback({
+            userId: this._credentials.userId,
+            pairId: this._credentials.pairId,
+            pairToken: this._credentials.pairToken,
+        });
+
+        this.emit('feedback-loaded', {
+            discussions: (result && result.discussions) || [],
+        });
+
+        return result;
+    }
+
+    /**
+     * Reply to an existing feedback discussion.
+     *
+     * @param {string} discussionId - The discussion to reply to
+     * @param {string} message      - The reply message
+     * @returns {Promise<{ messageId: string }>}
+     */
+    async replyToFeedback(discussionId, message) {
+        if (!discussionId || !message) {
+            throw new Error('discussionId and message are required');
+        }
+
+        var result = await this._api.feedbackReply({
+            userId: this._credentials.userId,
+            pairId: this._credentials.pairId,
+            pairToken: this._credentials.pairToken,
+            discussionId: discussionId,
+            message: message,
+        });
+
+        this.emit('feedback-reply-sent', {
+            discussionId: discussionId,
+            messageId: result.messageId,
+        });
+
+        return result;
+    }
+
+    /**
+     * Convert feedback params to a human-readable label.
+     *
+     * @param {object} params
+     * @param {object} params.feedback
+     * @param {string} params.feedback.category
+     * @returns {string}
+     */
+    static feedbackParamsToText(params) {
+        if (!params || !params.feedback) return '';
+        var labels = {
+            bypass: 'Bypass / Circumvention report',
+            missing_feature: 'Missing Feature report',
+            not_working: 'Not Working report',
+            question: 'Question',
+            other: 'General feedback',
+        };
+        return labels[params.feedback.category] || 'Feedback';
+    }
+
+    // ----------------------------------------------------------------
     // Internal — Pairing
     // ----------------------------------------------------------------
 
     async _startPairing() {
+        this._state = 'pairing';
+
         this._pairingWizard = new PairingWizard({
             api: this._api,
             credentialBackend: this._credentialBackend,
@@ -322,6 +546,7 @@ export class DeviceDaemon extends EventEmitter {
 
     async _onPaired(credentials) {
         this._credentials = credentials;
+        this._state = 'paired';
 
         this.emit('paired', {
             userId: credentials.userId,
@@ -343,6 +568,7 @@ export class DeviceDaemon extends EventEmitter {
 
         // If child was resolved, start the check loop
         if (this._childId) {
+            this._state = 'enforcing';
             this._startChecker();
         }
         // Otherwise, _resolveChild emitted 'child-select-required'
@@ -352,20 +578,58 @@ export class DeviceDaemon extends EventEmitter {
     async _resolveChild() {
         const children = (this._credentials && this._credentials.children) || [];
 
+        // Annotate children with lastUsedAt from credential backend
+        var annotatedChildren = [];
+        for (var i = 0; i < children.length; i++) {
+            var child = Object.assign({}, children[i]);
+            child.lastUsedAt = null;
+            annotatedChildren.push(child);
+        }
+
+        if (this._credentialBackend && typeof this._credentialBackend.loadLastUsed === 'function') {
+            try {
+                var lastUsedMap = await this._credentialBackend.loadLastUsed();
+                if (lastUsedMap) {
+                    for (var j = 0; j < annotatedChildren.length; j++) {
+                        var childId = annotatedChildren[j].id || annotatedChildren[j].childId;
+                        if (childId && lastUsedMap[childId]) {
+                            annotatedChildren[j].lastUsedAt = lastUsedMap[childId];
+                        }
+                    }
+                }
+            } catch (err) {
+                // Non-critical — proceed without lastUsedAt data
+                console.error('Failed to load lastUsed data:', err.message);
+            }
+        }
+
+        // Sort by lastUsedAt descending (most recent first), nulls last
+        // ISO 8601 strings sort correctly with localeCompare
+        annotatedChildren.sort(function (a, b) {
+            if (a.lastUsedAt && b.lastUsedAt) {
+                return b.lastUsedAt.localeCompare(a.lastUsedAt);
+            }
+            if (a.lastUsedAt && !b.lastUsedAt) return -1;
+            if (!a.lastUsedAt && b.lastUsedAt) return 1;
+            return 0;
+        });
+
         // Try automatic resolution (OS username mapping, etc.)
-        let match = null;
+        var match = null;
         if (typeof this._childResolver === 'function') {
-            match = this._childResolver(children);
+            match = this._childResolver(annotatedChildren);
         } else if (this._childResolver && typeof this._childResolver.resolve === 'function') {
-            match = await this._childResolver.resolve(children);
+            match = await this._childResolver.resolve(annotatedChildren);
         }
 
         if (match && match.childId) {
             this._childId = match.childId;
+            this._state = 'enforcing';
+            this._updateLastUsed(match.childId);
             this.emit('child-selected', { childId: match.childId, name: match.childName || null });
         } else {
             // No automatic match — need interactive selection
-            this.emit('child-select-required', { children: children });
+            this.emit('child-select-required', { children: annotatedChildren });
         }
     }
 
@@ -373,6 +637,8 @@ export class DeviceDaemon extends EventEmitter {
         if (this._checker) {
             this._checker.stop();
         }
+
+        var self = this;
 
         this._checker = new Checker({
             api: this._api,
@@ -386,6 +652,32 @@ export class DeviceDaemon extends EventEmitter {
             warningThresholds: this._warningThresholds,
         });
 
+        // Listen for unpaired events from the checker (HTTP 401)
+        this.on('unpaired', function onUnpaired() {
+            self._state = 'unpaired';
+            self._credentials = null;
+            if (self._checker) {
+                self._checker.stop();
+                self._checker = null;
+            }
+            self._childId = null;
+            // Remove this one-shot listener
+            self.removeListener('unpaired', onUnpaired);
+        });
+
         this._checker.start();
+    }
+
+    /**
+     * Persist the last-used timestamp for a child to the credential backend.
+     *
+     * @param {number} childId
+     */
+    _updateLastUsed(childId) {
+        if (this._credentialBackend && typeof this._credentialBackend.updateLastUsed === 'function') {
+            this._credentialBackend.updateLastUsed(childId).catch(function (err) {
+                console.error('Failed to update lastUsed for child ' + childId + ':', err.message);
+            });
+        }
     }
 }

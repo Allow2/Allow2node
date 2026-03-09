@@ -6,7 +6,8 @@
  */
 
 // Core
-export { DeviceDaemon } from './daemon.js';
+import { DeviceDaemon } from './daemon.js';
+export { DeviceDaemon };
 export { ChildShield } from './child-shield.js';
 export { PairingWizard } from './pairing.js';
 export { Allow2Api } from './api.js';
@@ -15,6 +16,10 @@ export { Allow2Api } from './api.js';
 export { UpdatePoller } from './updates.js';
 export { RequestManager } from './request.js';
 export { OfflineHandler } from './offline.js';
+
+// Convenience re-exports (also available as static methods on their classes)
+var feedbackParamsToText = DeviceDaemon.feedbackParamsToText;
+export { feedbackParamsToText };
 
 // Credential backends
 export { createBackend, PlaintextBackend } from './credentials/index.js';

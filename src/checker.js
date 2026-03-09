@@ -103,6 +103,20 @@ export class Checker {
     }
 
     /**
+     * Get remaining time for all tracked activities.
+     *
+     * @returns {object} Map of activityId → { allowed, remaining } or null if no state
+     */
+    getRemaining() {
+        if (this._state.size === 0) return null;
+        var result = {};
+        this._state.forEach(function (val, key) {
+            result[key] = { allowed: val.allowed, remaining: val.remaining };
+        });
+        return result;
+    }
+
+    /**
      * Reset all state (e.g., new child selected).
      */
     reset(childId) {
