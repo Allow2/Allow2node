@@ -83,6 +83,7 @@ export class DeviceDaemon extends EventEmitter {
         this._childId = null;
         this._running = false;
         this._pairingWizard = null;
+        this._heartbeatTimer = null;
 
         /** @type {'unpaired'|'pairing'|'paired'|'enforcing'|'parent'} */
         this._state = 'unpaired';
@@ -163,6 +164,7 @@ export class DeviceDaemon extends EventEmitter {
      */
     stop() {
         this._running = false;
+        this._stopHeartbeat();
         if (this._checker) {
             this._checker.stop();
             this._checker = null;
@@ -586,6 +588,60 @@ export class DeviceDaemon extends EventEmitter {
     }
 
     // ----------------------------------------------------------------
+    // Internal — Heartbeat (paired but no checker running)
+    // ----------------------------------------------------------------
+
+    /**
+     * Start a lightweight heartbeat poll that validates credentials
+     * and refreshes children data. Runs when paired but no child is
+     * selected (no checker running). Detects 401 → unpair.
+     */
+    _startHeartbeat() {
+        this._stopHeartbeat();
+
+        var self = this;
+        this._heartbeatTimer = setInterval(function () {
+            // Stop if checker took over or we're no longer paired
+            if (self._checker || !self._credentials || !self._credentials.pairId) {
+                self._stopHeartbeat();
+                return;
+            }
+
+            self._api.getUpdates({
+                userId: self._credentials.userId,
+                pairId: self._credentials.pairId,
+                pairToken: self._credentials.pairToken,
+            }).then(function (result) {
+                // Refresh children if data returned
+                if (result && result.children) {
+                    self._credentials.children = result.children;
+                    self.emit('children-updated', { children: result.children });
+                }
+            }).catch(function (err) {
+                if (err && err.status === 401) {
+                    self._stopHeartbeat();
+                    self._state = 'unpaired';
+                    self._credentials = null;
+                    self._childId = null;
+                    // Clear stored credentials
+                    if (self._credentialBackend && typeof self._credentialBackend.clear === 'function') {
+                        self._credentialBackend.clear().catch(function () { /* best effort */ });
+                    }
+                    self.emit('unpaired', { error: err });
+                }
+                // Other errors (network) — just retry next interval
+            });
+        }, 60000); // every 60 seconds
+    }
+
+    _stopHeartbeat() {
+        if (this._heartbeatTimer) {
+            clearInterval(this._heartbeatTimer);
+            this._heartbeatTimer = null;
+        }
+    }
+
+    // ----------------------------------------------------------------
     // Internal — Enforcement
     // ----------------------------------------------------------------
 
@@ -596,10 +652,13 @@ export class DeviceDaemon extends EventEmitter {
         // If child was resolved, start the check loop
         if (this._childId) {
             this._state = 'enforcing';
+            this._stopHeartbeat();
             this._startChecker();
+        } else {
+            // No child selected yet — start heartbeat to validate credentials
+            // and detect 401 (device released) while waiting on the selector
+            this._startHeartbeat();
         }
-        // Otherwise, _resolveChild emitted 'child-select-required'
-        // and we wait for selectChild() to be called
     }
 
     async _resolveChild() {
