@@ -47,6 +47,8 @@ export class PairingWizard extends EventEmitter {
         this._app = null;
         this._pollTimer = null;
         this._qrUrl = null;
+        this._connected = false;  // tracks server connectivity
+        this._consecutiveErrors = 0;
     }
 
     /**
@@ -58,6 +60,12 @@ export class PairingWizard extends EventEmitter {
      * @returns {Promise<{ pin: string, port: number, url: string, qrUrl: string }>}
      */
     async start() {
+        // Guard: prevent double-start
+        if (this._pollTimer || this._initRetryTimer) {
+            console.warn('[pairing] start() called but already running — ignoring');
+            return { pin: this._pin, port: this._port, url: 'http://localhost:' + this._port, qrUrl: this._qrUrl, connected: this._connected };
+        }
+
         this._paired = false;
         this._pairingResult = null;
 
@@ -87,13 +95,17 @@ export class PairingWizard extends EventEmitter {
             // Use server-assigned PIN and session ID
             this._pin = String(apiResult.pin);
             this._sessionId = apiResult.sessionId || apiResult.pairingSessionId || null;
+            this._connected = true;
+            this._consecutiveErrors = 0;
             console.log('[pairing] Using server PIN: ' + this._pin + ' (session=' + this._sessionId + ')');
         } else {
-            // Fallback: generate local PIN (won't work without API registration,
-            // but at least shows something to the user)
-            this._pin = _generatePin();
+            // API unreachable — no valid PIN yet
+            this._pin = '------';
             this._sessionId = null;
-            console.warn('[pairing] Using local PIN (no API session): ' + this._pin);
+            this._connected = false;
+            console.warn('[pairing] API unreachable — will retry');
+            // Start retry loop to get a valid session
+            this._startInitRetry();
         }
 
         // Build QR deep link URL
@@ -120,8 +132,9 @@ export class PairingWizard extends EventEmitter {
             port: port,
             url: 'http://localhost:' + port,
             qrUrl: this._qrUrl,
+            connected: this._connected,
         };
-        this.emit('started', { pin: this._pin, port: port, qrUrl: this._qrUrl });
+        this.emit('started', { pin: this._pin, port: port, qrUrl: this._qrUrl, connected: this._connected });
         return info;
     }
 
@@ -133,6 +146,10 @@ export class PairingWizard extends EventEmitter {
         if (this._pollTimer) {
             clearInterval(this._pollTimer);
             this._pollTimer = null;
+        }
+        if (this._initRetryTimer) {
+            clearInterval(this._initRetryTimer);
+            this._initRetryTimer = null;
         }
 
         if (!this._server) return;
@@ -230,6 +247,50 @@ export class PairingWizard extends EventEmitter {
     }
 
     /**
+     * Retry initPINPairing when the initial attempt failed (no connectivity).
+     * Retries every 5s until a valid session is obtained.
+     */
+    _startInitRetry() {
+        if (this._initRetryTimer) return;
+
+        var self = this;
+        this._initRetryTimer = setInterval(async function () {
+            if (self._paired || self._sessionId) {
+                clearInterval(self._initRetryTimer);
+                self._initRetryTimer = null;
+                return;
+            }
+
+            try {
+                var result = await self._api.initPINPairing({
+                    uuid: self._uuid,
+                    deviceName: self._deviceName,
+                });
+
+                if (result && result.pin) {
+                    clearInterval(self._initRetryTimer);
+                    self._initRetryTimer = null;
+
+                    self._pin = String(result.pin);
+                    self._sessionId = result.sessionId || result.pairingSessionId || null;
+                    self._qrUrl = 'https://app.allow2.com/pair?pin=' + self._pin;
+                    self._connected = true;
+                    self._consecutiveErrors = 0;
+
+                    console.log('[pairing] Reconnected! PIN: ' + self._pin + ' (session=' + self._sessionId + ')');
+                    self.emit('connection-status', { connected: true, pin: self._pin, qrUrl: self._qrUrl });
+
+                    // Now start polling for parent confirmation
+                    self._startPolling();
+                }
+            } catch (err) {
+                console.warn('[pairing] Init retry failed:', err.message);
+                self.emit('connection-status', { connected: false });
+            }
+        }, 5000);
+    }
+
+    /**
      * Start polling the Allow2 API for pairing confirmation.
      */
     _startPolling() {
@@ -257,9 +318,23 @@ export class PairingWizard extends EventEmitter {
             self._api.checkPairingStatus(self._sessionId).then(function (result) {
                 if (result && result.paired && result.userId && result.pairId && result.pairToken) {
                     self.completePairing(result);
+                    return;
+                }
+                // Successful poll — mark as connected
+                if (!self._connected) {
+                    self._connected = true;
+                    self._consecutiveErrors = 0;
+                    console.log('[pairing] Connection restored');
+                    self.emit('connection-status', { connected: true });
                 }
             }).catch(function (err) {
-                // Polling errors are non-fatal — just retry next interval
+                self._consecutiveErrors++;
+                // After 2 consecutive failures (~10s), mark as disconnected
+                if (self._consecutiveErrors >= 2 && self._connected) {
+                    self._connected = false;
+                    console.warn('[pairing] Connection lost:', err.message);
+                    self.emit('connection-status', { connected: false });
+                }
                 if (pollCount % 12 === 0) { // log every minute
                     console.warn('[pairing] Poll error:', err.message);
                 }

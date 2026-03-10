@@ -187,6 +187,22 @@ export class DeviceDaemon extends EventEmitter {
      * If unpaired, starts the pairing flow.
      * If already paired, emits status info for the UI to display.
      */
+    /**
+     * Called when the user closes the Allow2 app / UI.
+     * Stops the pairing wizard if running (clears polling timers).
+     */
+    closeApp() {
+        if (this._pairingWizard) {
+            this._pairingWizard.stop();
+            this._pairingWizard = null;
+        }
+        // Stay in current state — unpaired devices remain unpaired,
+        // paired devices keep enforcing
+        if (!this._credentials || !this._credentials.pairId) {
+            this._state = 'unpaired';
+        }
+    }
+
     async openApp() {
         if (this._state === 'unpaired' || (!this._credentials || !this._credentials.pairId)) {
             // Start pairing flow
@@ -533,6 +549,10 @@ export class DeviceDaemon extends EventEmitter {
             self.emit('pairing-error', err);
         });
 
+        this._pairingWizard.on('connection-status', function (status) {
+            self.emit('pairing-connection-status', status);
+        });
+
         try {
             var info = await this._pairingWizard.start();
 
@@ -544,6 +564,7 @@ export class DeviceDaemon extends EventEmitter {
                 port: info.port,
                 url: info.url,
                 qrUrl: info.qrUrl,
+                connected: info.connected,
             });
         } catch (err) {
             this.emit('pairing-error', err);
