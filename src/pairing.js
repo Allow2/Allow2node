@@ -196,6 +196,7 @@ export class PairingWizard extends EventEmitter {
             }
 
             var credentials = {
+                uuid: this._uuid,
                 userId: pairingData.userId,
                 pairId: pairingData.pairId,
                 pairToken: pairingData.pairToken,
@@ -208,11 +209,7 @@ export class PairingWizard extends EventEmitter {
             this._paired = true;
             this._pairingResult = credentials;
 
-            this.emit('paired', {
-                userId: credentials.userId,
-                pairToken: credentials.pairToken,
-                children: credentials.children,
-            });
+            this.emit('paired', credentials);
 
             // Auto-terminate the wizard after successful pairing
             await this.stop();
