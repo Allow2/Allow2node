@@ -508,6 +508,11 @@ export class DeviceDaemon extends EventEmitter {
     // ----------------------------------------------------------------
 
     async _startPairing() {
+        // Guard: don't create a second pairing session if one is already active
+        if (this._state === 'pairing' && this._pairingWizard) {
+            return;
+        }
+
         this._state = 'pairing';
 
         this._pairingWizard = new PairingWizard({
