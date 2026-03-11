@@ -4,7 +4,9 @@
 [![npm downloads](https://img.shields.io/npm/dm/allow2.svg?style=flat-square)](https://www.npmjs.com/package/allow2)
 [![Node.js CI](https://img.shields.io/github/actions/workflow/status/Allow2/allow2node/ci.yml?style=flat-square)](https://github.com/Allow2/allow2node/actions)
 
-Official Allow2 Parental Freedom SDK for Node.js.
+Official Allow2 Parental Freedom **Device SDK** for Node.js — for software that runs on a child's device (games, desktop apps, IoT, set-top boxes).
+
+> **Building a web service with user accounts?** Use [`allow2-service`](https://www.npmjs.com/package/allow2-service) (the Service SDK) instead. Device and Service SDKs are separate packages — see [SDK Architecture](https://developer.allow2.com/sdk-architecture) for rationale.
 
 | | |
 |---|---|
