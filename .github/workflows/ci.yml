@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, 'v*']
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - run: npm ci
+
+      - name: Run tests
+        run: |
+          if [ -d tests ] || [ -d test ]; then
+            npm test
+          else
+            echo "No test directory found, skipping tests"
+          fi
+
+      - name: Lint
+        if: matrix.node-version == 20
+        run: npx eslint src/ || true

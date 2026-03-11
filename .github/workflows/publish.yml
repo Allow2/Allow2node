@@ -1,0 +1,112 @@
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - name: Run tests
+        run: |
+          if [ -d tests ] || [ -d test ]; then
+            npm test
+          else
+            echo "No test directory found, skipping tests"
+          fi
+
+      - name: Determine version metadata
+        id: meta
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          if echo "$VERSION" | grep -q "alpha"; then
+            echo "dist_tag=alpha" >> $GITHUB_OUTPUT
+          elif echo "$VERSION" | grep -q "beta"; then
+            echo "dist_tag=beta" >> $GITHUB_OUTPUT
+          elif echo "$VERSION" | grep -q "rc"; then
+            echo "dist_tag=next" >> $GITHUB_OUTPUT
+          else
+            echo "dist_tag=latest" >> $GITHUB_OUTPUT
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Verify version matches tag
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION=${{ steps.meta.outputs.version }}
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::package.json version ($PKG_VERSION) does not match tag (v$TAG_VERSION)"
+            exit 1
+          fi
+
+      - name: Pack tarball
+        run: npm pack
+
+      - name: Upload tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarball
+          path: '*.tgz'
+          retention-days: 30
+
+  publish-npm:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      - name: Determine dist-tag
+        id: tag
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          if echo "$VERSION" | grep -q "alpha"; then
+            echo "dist_tag=alpha" >> $GITHUB_OUTPUT
+          elif echo "$VERSION" | grep -q "beta"; then
+            echo "dist_tag=beta" >> $GITHUB_OUTPUT
+          elif echo "$VERSION" | grep -q "rc"; then
+            echo "dist_tag=next" >> $GITHUB_OUTPUT
+          else
+            echo "dist_tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public --tag ${{ steps.tag.outputs.dist_tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-tarball
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: '*.tgz'
+          generate_release_notes: true

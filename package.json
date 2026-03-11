@@ -28,6 +28,14 @@
   },
   "author": "Allow2 Pty Ltd",
   "license": "SEE LICENSE IN LICENSE FILE",
+  "bugs": {
+    "url": "https://github.com/Allow2/allow2node/issues"
+  },
+  "files": [
+    "src/",
+    "LICENSE",
+    "README.md"
+  ],
   "dependencies": {
     "express": "^4.21.0"
   }
