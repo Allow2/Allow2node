@@ -58,7 +58,7 @@ await daemon.openApp();  // triggers pairing if unpaired
 | **Checker** | `checker.js` | Permission check loop with per-activity enforcement and stacking |
 | **Warnings** | `warnings.js` | Configurable progressive warning scheduler |
 | **Offline** | `offline.js` | Response cache, grace period, deny-by-default fallback |
-| **Request** | `request.js` | "Request More Time" flow with polling |
+| **Request** | `request.js` | Request flow (more time, day type change, ban lift) with polling |
 | **Updates** | `updates.js` | Poll for children, quota, ban, and day type changes |
 | **Credentials** | `credentials/` | `PlaintextBackend` default + pluggable `createBackend()` factory |
 | **Child Resolvers** | `child-resolver/` | OS username mapping (`linux-user.js`) and interactive selector |
@@ -173,7 +173,7 @@ The SDK follows the Allow2 Device Operational Lifecycle:
 3. **Parent Access** -- parent verifies via their Allow2 app (iOS/Android), web portal, or locally with PIN for unrestricted mode
 4. **Permission Checks** (continuous) -- POST to service URL every 30-60s with `log: true`
 5. **Warnings & Countdowns** -- progressive alerts before blocking
-6. **Request More Time** -- child requests, parent approves/denies from their phone (also works offline)
+6. **Requests** -- child requests changes (more time, day type change, ban lift), parent approves/denies from their phone (also works offline via voice codes)
 7. **Feedback** -- bug reports and feature requests sent directly to you, the developer
 
 All API communication uses native `fetch` with no external dependencies. The check endpoint POSTs to the **service URL** (`service.allow2.com`), while all other endpoints use the **API URL** (`api.allow2.com`).
@@ -188,7 +188,7 @@ On the device side:
 
 - **Cached permissions** -- the last successful check result is cached locally. During a configurable grace period (default 5 minutes), the device continues to enforce the cached result.
 - **Deny-by-default** -- after the grace period expires without connectivity, all activities are blocked. This prevents children from bypassing controls by disabling Wi-Fi or enabling airplane mode.
-- **Request More Time (offline)** -- children can still submit requests even when the device is offline. The request is presented to the parent via their app or a voice code that can be read over the phone. The parent approves or denies from their end, and the device applies the result when connectivity resumes (or immediately via a voice code response entered locally).
+- **Requests (offline)** -- children can still submit all request types (more time, day type change, ban lift) even when the device is offline. The request is presented to the parent via their app or a voice code that can be read over the phone. The parent approves or denies from their end, and the device applies the result when connectivity resumes (or immediately via a voice code response entered locally).
 - **Automatic resync** -- when the device comes back online, it immediately fetches the latest permissions, processes any queued requests, and resumes normal check polling.
 
 This means a paired device is never "unmanageable" -- the parent always has control, regardless of the device's network state.
