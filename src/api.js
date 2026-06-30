@@ -10,7 +10,7 @@
  *
  * Production defaults are baked in. In NON-PRODUCTION (dev) builds only, the target
  * can be switched for testing:
- *   ALLOW2_ENV=staging        (or sandbox / production)   ← preferred switch
+ *   ALLOW2_ENV=staging        (or production)             ← preferred switch
  *   ALLOW2_API_URL=https://custom-api.example.com         ← advanced raw-URL escape hatch
  *   ALLOW2_VID=12345
  *   ALLOW2_TOKEN=mytoken
@@ -59,7 +59,7 @@ function resolveEnvironment() {
         return { apiUrl: PROD_API_URL, serviceUrl: PROD_SERVICE_URL, name: 'production', overridable: false };
     }
     const env = (process.env.ALLOW2_ENV || '').toLowerCase();
-    if (env === 'staging' || env === 'sandbox') {
+    if (env === 'staging') {
         console.warn('⚠️  Allow2 SDK targeting ' + env.toUpperCase() +
             ' — DEV ONLY; release builds (ALLOW2_PRODUCTION=1 / NODE_ENV=production) always use production.');
         return { apiUrl: STAGING_API_URL, serviceUrl: STAGING_SERVICE_URL, name: env, overridable: true };
