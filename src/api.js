@@ -8,13 +8,64 @@
  * version token (deviceToken). These identify the APPLICATION (e.g., "allow2linux"),
  * not the individual device. The per-device identity is the uuid field.
  *
- * Production defaults are baked in. Override via environment variables for testing:
- *   ALLOW2_API_URL=https://custom-api.example.com
+ * Production defaults are baked in. In NON-PRODUCTION (dev) builds only, the target
+ * can be switched for testing:
+ *   ALLOW2_ENV=staging        (or sandbox / production)   ← preferred switch
+ *   ALLOW2_API_URL=https://custom-api.example.com         ← advanced raw-URL escape hatch
  *   ALLOW2_VID=12345
  *   ALLOW2_TOKEN=mytoken
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ * PRODUCTION SAFETY — HARD GUARD
+ * ──────────────────────────────────────────────────────────────────────────────
+ * Node has no compile step, so the production guard is a BUILD-BAKED FLAG that the
+ * release/installer build MUST set:
+ *
+ *     ALLOW2_PRODUCTION=1        (preferred — set by the packaged/release build)
+ *   or NODE_ENV=production
+ *
+ * When EITHER is in effect, every staging override (ALLOW2_ENV and ALLOW2_API_URL,
+ * including an explicit options.apiUrl) is IGNORED and the production endpoints are
+ * used unconditionally. A shipped product can therefore never attach to staging by
+ * any runtime input. Release/installer builds MUST bake ALLOW2_PRODUCTION=1.
  */
 
-const DEFAULT_API_URL = 'https://api.allow2.com';
+// Production endpoints — always the default, and the ONLY option in a production build.
+const PROD_API_URL = 'https://api.allow2.com';
+const PROD_SERVICE_URL = 'https://service.allow2.com';
+
+// Staging endpoints — reachable ONLY from a non-production (dev) build.
+const STAGING_API_URL = 'https://staging-api.allow2.com';
+const STAGING_SERVICE_URL = 'https://staging-service.allow2.com';
+
+// Back-compat export (some callers reference DEFAULT_API_URL).
+const DEFAULT_API_URL = PROD_API_URL;
+
+// Build-baked production flag. Release/installer builds MUST set ALLOW2_PRODUCTION=1
+// (NODE_ENV=production is also honoured). When true, all staging overrides are dead.
+const IS_PRODUCTION_BUILD =
+    process.env.ALLOW2_PRODUCTION === '1' ||
+    process.env.ALLOW2_PRODUCTION === 'true' ||
+    process.env.NODE_ENV === 'production';
+
+/**
+ * Resolve the target endpoints for the CURRENT BUILD.
+ *
+ * Hard guard: in a production build this ALWAYS returns the production endpoints and
+ * marks the result non-overridable — ALLOW2_ENV is ignored entirely.
+ */
+function resolveEnvironment() {
+    if (IS_PRODUCTION_BUILD) {
+        return { apiUrl: PROD_API_URL, serviceUrl: PROD_SERVICE_URL, name: 'production', overridable: false };
+    }
+    const env = (process.env.ALLOW2_ENV || '').toLowerCase();
+    if (env === 'staging' || env === 'sandbox') {
+        console.warn('⚠️  Allow2 SDK targeting ' + env.toUpperCase() +
+            ' — DEV ONLY; release builds (ALLOW2_PRODUCTION=1 / NODE_ENV=production) always use production.');
+        return { apiUrl: STAGING_API_URL, serviceUrl: STAGING_SERVICE_URL, name: env, overridable: true };
+    }
+    return { apiUrl: PROD_API_URL, serviceUrl: PROD_SERVICE_URL, name: 'production', overridable: true };
+}
 
 // Default production VID/Token for allow2linux.
 // Register your own at https://developer.allow2.com for other integrations.
@@ -31,7 +82,23 @@ export class Allow2Api {
      * @param {number} [options.timeout] - Request timeout in ms (default 15000)
      */
     constructor(options = {}) {
-        this.baseUrl = options.apiUrl || process.env.ALLOW2_API_URL || DEFAULT_API_URL;
+        // Resolve endpoints through the production guard. In a production build the
+        // result is non-overridable; in a dev build, a raw-URL override (options.apiUrl
+        // or ALLOW2_API_URL) is honoured as an advanced escape hatch.
+        const resolved = resolveEnvironment();
+        let apiUrl = resolved.apiUrl;
+        let serviceUrl = resolved.serviceUrl;
+        if (resolved.overridable) {
+            const override = options.apiUrl || process.env.ALLOW2_API_URL;
+            if (override) {
+                console.warn('⚠️  Allow2 SDK using custom endpoint ' + override + ' — DEV ONLY.');
+                apiUrl = override;
+                serviceUrl = override;
+            }
+        }
+        this.environment = resolved.name;
+        this.baseUrl = apiUrl;
+        this.serviceUrl = serviceUrl;
         this.timeout = options.timeout || 15000;
 
         // VID/Token: explicit option > env var > baked-in default
