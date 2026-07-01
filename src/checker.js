@@ -7,6 +7,7 @@
  */
 
 import { WarningScheduler } from './warnings.js';
+import { OfflineHandler } from './offline.js';
 
 // Activity ID 8 = Screen Time (device-level master switch)
 const SCREEN_TIME_ACTIVITY = 8;
@@ -34,6 +35,15 @@ export class Checker {
         this._checkInterval = (options.checkInterval || 60) * 1000;
         this._hardLockTimeout = (options.hardLockTimeout || 300) * 1000;
         this._gracePeriod = (options.gracePeriod || 300) * 1000;
+
+        // Disk-backed offline cache. The grace window is measured from the last
+        // SUCCESSFUL check (persisted to ~/.allow2/cache.json), so it survives a
+        // daemon restart during an outage — a restart can no longer reset the
+        // grace clock (which would let a child farm grace by rebooting).
+        this._offline = options.offlineHandler || new OfflineHandler({
+            gracePeriod: options.gracePeriod || 300,
+            cachePath: options.cachePath,
+        });
 
         this._tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -142,7 +152,7 @@ export class Checker {
         try {
             await this._doCheck();
         } catch (err) {
-            this._handleError(err);
+            await this._handleError(err);
         }
 
         if (this._running) {
@@ -168,10 +178,17 @@ export class Checker {
             log: true,
         });
 
-        // Successful API call — clear offline state
+        // Successful API call — clear offline state and persist the result so
+        // the offline grace window (and last-known-good decision) survive a
+        // daemon restart.
         if (this._offlineSince) {
             this._offlineSince = null;
             this._offlineGraceEmitted = false;
+        }
+        try {
+            await this._offline.cacheResult(result);
+        } catch (_e) {
+            // Disk write failure is non-fatal — enforcement continues.
         }
 
         this._processResult(result);
@@ -261,7 +278,7 @@ export class Checker {
         }, this._hardLockTimeout);
     }
 
-    _handleError(err) {
+    async _handleError(err) {
         // HTTP 401 = credentials revoked, device unpaired
         if (err && err.status === 401) {
             this._emit('unpaired', { error: err });
@@ -269,13 +286,33 @@ export class Checker {
             return;
         }
 
-        // Network / timeout errors → offline handling
+        // Network / timeout errors → offline handling.
+        //
+        // Grace is measured from the last SUCCESSFUL check, read from the
+        // disk-backed cache, so it survives a daemon restart mid-outage. If the
+        // device has NEVER synced (no cache yet), fall back to in-memory
+        // first-failure tracking so a brand-new device still gets its grace
+        // window rather than an instant deny.
         const now = Date.now();
-        if (!this._offlineSince) {
-            this._offlineSince = now;
+        let offlineDuration;
+
+        let elapsedSec = Infinity;
+        try {
+            elapsedSec = await this._offline.getGraceElapsed();
+        } catch (_e) {
+            elapsedSec = Infinity;
         }
 
-        const offlineDuration = now - this._offlineSince;
+        if (elapsedSec !== Infinity && Number.isFinite(elapsedSec)) {
+            offlineDuration = elapsedSec * 1000;
+            // Keep _offlineSince coherent for the event payload / diagnostics.
+            this._offlineSince = now - offlineDuration;
+        } else {
+            if (!this._offlineSince) {
+                this._offlineSince = now;
+            }
+            offlineDuration = now - this._offlineSince;
+        }
 
         if (offlineDuration < this._gracePeriod) {
             if (!this._offlineGraceEmitted) {
