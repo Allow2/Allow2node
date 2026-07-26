@@ -119,6 +119,30 @@ for (const thread of discussions) {
 await daemon.replyToFeedback(discussionId, 'This happens every Tuesday.');
 ```
 
+## Usage-Auth Events (plane-2)
+
+When someone identifies themselves to **start a usage session** on the device — enters the
+account/child PIN, passes an offline 6-digit / QR self-auth, or is locally auto-identified —
+report it so the server can alert the account holder (and other parents) and keep an audit trail:
+
+```js
+// Call this the moment a usage-auth succeeds locally (e.g. on PIN success).
+// The device has ALREADY authorized locally (offline-first); this is a
+// notification + audit signal, not an authorization.
+await daemon.reportAuthEvent({
+    method: 'pin',        // 'pin' | 'offline_code' | 'qr' (anything else => generic 'token')
+    // childId defaults to the currently selected child
+});
+
+daemon.on('auth-event-reported', ({ childId, method }) => {
+    console.log(`Reported ${method} auth for child ${childId}`);
+});
+```
+
+Best-effort, exactly like `logUsage`: a single POST over the paired-device seam, with **no offline
+queue or replay** — the server does not deduplicate, so a replayed event would double-notify the
+parent. The SDK exposes the capability; your enforcer decides when to call it.
+
 ## Warnings
 
 The SDK fires progressive warnings as time runs out:

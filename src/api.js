@@ -365,4 +365,45 @@ export class Allow2Api {
             }),
         });
     }
+
+    // ----------------------------------------------------------------
+    // Usage-Auth Events (plane-2)
+    // ----------------------------------------------------------------
+
+    /**
+     * Report a plane-2 usage-auth event: someone identified themselves to START a usage
+     * session on this paired device (entered the account/child PIN, passed an offline
+     * 6-digit / QR self-auth, or was locally auto-identified).
+     *
+     * This is a NOTIFICATION + audit signal, NOT an authorization. The device has already
+     * authorized locally (offline-first); the server merely records a login-history row and
+     * fires the plane-2 notify so the account holder / other parents are alerted (a compromise
+     * — "someone authed as you on X" — gets caught). Server: `src/controllers/authEvent.ts`,
+     * `POST /api/authEvent` over the SAME pairToken seam as logUsage.
+     *
+     * Best-effort, like logUsage: a single direct POST. The server does NOT dedup — each call
+     * fires a fresh notify — so callers MUST NOT blindly retry/replay this (a replayed auth
+     * event would double-notify the parent). There is deliberately no offline store-and-forward.
+     *
+     * @param {object} params
+     * @param {string} params.userId    - Account owner id (from pairing credentials)
+     * @param {number} params.pairId    - Paired device id (from pairing credentials)
+     * @param {string} params.pairToken - Per-pairing secret (from pairing credentials)
+     * @param {string} [params.childId] - The child/person who authed, when known AND within the device's scope
+     * @param {string} [params.method]  - Auth method: 'pin' | 'offline_code' | 'qr' (anything else => generic 'token')
+     * @returns {Promise<{ status: string }>}
+     */
+    async reportAuthEvent(params) {
+        return this._fetch('/api/authEvent', {
+            method: 'POST',
+            body: JSON.stringify({
+                userId: params.userId,
+                pairId: params.pairId,
+                pairToken: params.pairToken,
+                deviceToken: this.token,
+                childId: params.childId,
+                method: params.method,
+            }),
+        });
+    }
 }

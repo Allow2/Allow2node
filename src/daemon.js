@@ -364,6 +364,50 @@ export class DeviceDaemon extends EventEmitter {
     }
 
     // ----------------------------------------------------------------
+    // Usage-Auth Events (plane-2)
+    // ----------------------------------------------------------------
+
+    /**
+     * Report a plane-2 usage-auth: the consuming enforcer calls this WHEN someone identifies
+     * to start a usage session on this device (account/child PIN accepted, an offline 6-digit /
+     * QR self-auth verified locally, or a local auto-identify). The server records a
+     * login-history row and notifies the account holder / other parents. NOTIFICATION + audit
+     * only — the device has already authorized locally (offline-first).
+     *
+     * Best-effort, mirroring logUsage: a single POST with NO offline queue/replay — the server
+     * does NOT dedup, so a replayed event would double-notify the parent. The SDK exposes the
+     * capability; the consumer decides exactly when to call it (e.g. on PIN success).
+     *
+     * @param {object} [params]
+     * @param {string} [params.method]  - 'pin' | 'offline_code' | 'qr' (anything else => generic 'token')
+     * @param {number} [params.childId] - The person who authed; defaults to the currently selected child
+     * @returns {Promise<{ status: string }>}
+     */
+    async reportAuthEvent(params) {
+        if (!this._credentials || !this._credentials.pairId || !this._credentials.pairToken) {
+            throw new Error('Device not paired');
+        }
+
+        var opts = params || {};
+        var childId = opts.childId != null ? opts.childId : this._childId;
+
+        var result = await this._api.reportAuthEvent({
+            userId: this._credentials.userId,
+            pairId: this._credentials.pairId,
+            pairToken: this._credentials.pairToken,
+            childId: childId != null ? childId : undefined,
+            method: opts.method,
+        });
+
+        this.emit('auth-event-reported', {
+            childId: childId != null ? childId : null,
+            method: opts.method || null,
+        });
+
+        return result;
+    }
+
+    // ----------------------------------------------------------------
     // Feedback
     // ----------------------------------------------------------------
 
